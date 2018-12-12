@@ -89,6 +89,12 @@ SNOWFLAKE_CREDENTIALS_CONTRACT = {
     'type': 'object',
     'additionalProperties': False,
     'properties': {
+         'method': {
+            'enum': ['database', 'oauth', 'oauth_externalbrowser'],
+            'description': (
+                'database: use user/pass creds; oauth use oauth user/pass creds; oauth_externalbrowser no pass required'
+            ),
+        },
         'account': {
             'type': 'string',
         },
@@ -97,6 +103,9 @@ SNOWFLAKE_CREDENTIALS_CONTRACT = {
         },
         'password': {
             'type': 'string',
+        },
+        'authenticator': {
+            'type': 'string'
         },
         'database': {
             'type': 'string',
@@ -114,7 +123,7 @@ SNOWFLAKE_CREDENTIALS_CONTRACT = {
             'type': 'boolean',
         }
     },
-    'required': ['account', 'user', 'password', 'database', 'schema'],
+    'required': ['account', 'user', 'database', 'schema'],
 }
 
 BIGQUERY_CREDENTIALS_CONTRACT = {

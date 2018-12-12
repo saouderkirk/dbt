@@ -21,7 +21,6 @@ class TestSnowflakeAdapter(unittest.TestCase):
                     'type': 'snowflake',
                     'account': 'test_account',
                     'user': 'test_user',
-                    'password': 'test_password',
                     'database': 'test_databse',
                     'warehouse': 'test_warehouse',
                     'schema': 'public',
@@ -100,8 +99,8 @@ class TestSnowflakeAdapter(unittest.TestCase):
             mock.call(
                 account='test_account', autocommit=False,
                 client_session_keep_alive=False, database='test_databse',
-                password='test_password', role=None, schema='public',
-                user='test_user', warehouse='test_warehouse')
+                role=None, schema='public', user='test_user', 
+                warehouse='test_warehouse')
         ])
 
     def test_client_session_keep_alive_true(self):
@@ -113,7 +112,49 @@ class TestSnowflakeAdapter(unittest.TestCase):
         self.snowflake.assert_has_calls([
             mock.call(
                 account='test_account', autocommit=False,
-                client_session_keep_alive=True, database='test_databse',
+                client_session_keep_alive=True, database='test_databse', 
+                role=None, schema='public', user='test_user', 
+                warehouse='test_warehouse')
+        ])
+
+
+    def test_user_pass_authentication(self):
+        self.config.credentials = self.config.credentials.incorporate(
+            password='test_password')
+        self.adapter = SnowflakeAdapter(self.config)
+        self.adapter.get_connection(name='new_connection_with_new_config')
+
+        self.snowflake.assert_has_calls([
+            mock.call(
+                account='test_account', autocommit=False,
+                client_session_keep_alive=False, database='test_databse',
                 password='test_password', role=None, schema='public',
                 user='test_user', warehouse='test_warehouse')
+        ])
+
+    def test_authenticator_user_pass_authentication(self):
+        self.config.credentials = self.config.credentials.incorporate(
+            password='test_password', authenticator='test_sso_url')
+        self.adapter = SnowflakeAdapter(self.config)
+        self.adapter.get_connection(name='new_connection_with_new_config')
+
+        self.snowflake.assert_has_calls([
+            mock.call(
+                account='test_account', autocommit=False,
+                client_session_keep_alive=False, database='test_databse',
+                password='test_password', role=None, schema='public',
+                user='test_user', warehouse='test_warehouse',
+                authenticator='test_sso_url')
+        ])
+    def test_authenticator_externalbrowser_authentication(self):
+        self.config.credentials = self.config.credentials.incorporate(authenticator='externalbrowser')
+        self.adapter = SnowflakeAdapter(self.config)
+        self.adapter.get_connection(name='new_connection_with_new_config')
+
+        self.snowflake.assert_has_calls([
+            mock.call(
+                account='test_account', autocommit=False,
+                client_session_keep_alive=False, database='test_databse',
+                role=None, schema='public', user='test_user', 
+                warehouse='test_warehouse', authenticator='externalbrowser')
         ])

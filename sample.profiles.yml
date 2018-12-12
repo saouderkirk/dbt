@@ -37,13 +37,43 @@ config:
 #
 #   [profile-name]:
 #     outputs:
-#       [target-name]:
+#       # 1. Use snowflake user/pass
+#       [target-name-1]:
 #         type: snowflake
 #         threads: [1 - 8]
 #         account: [url prefix for your snowflake connection]
 #
 #         user: [user]
 #         password: [password]
+#         role: [optional, the snowflake role you want to use]
+#
+#         database: [db name]
+#         warehouse: [warehouse]
+#         schema: [schema name]
+#
+#       # 2. Use Okta user/pass
+#       [target-name-2]:
+#         type: snowflake
+#         threads: [1 - 8]
+#         account: [url prefix for your snowflake connection]
+#           
+#         authenticator: 'https://<okta_accout_name>.okta.com/'
+#         user: [okta_user]
+#         password: [okta_password]
+#         role: [optional, the snowflake role you want to use]
+#
+#         database: [db name]
+#         warehouse: [warehouse]
+#         schema: [schema name]
+#
+#       # 3. Use externalbrowser, no password required
+#       [target-name-3]:
+#         type: snowflake
+#         threads: [1 - 8]
+#         account: [url prefix for your snowflake connection]
+#           
+#         authenticator: 'externalbrowser'
+#         user: [sso_user]
 #         role: [optional, the snowflake role you want to use]
 #
 #         database: [db name]

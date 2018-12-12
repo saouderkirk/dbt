@@ -76,8 +76,11 @@ class SnowflakeAdapter(PostgresAdapter):
 
         try:
             credentials = connection.credentials
-            # Pull all of the optional authentication args for the connector, let connector handle the actual arg validation 
-            auth_args = { auth_key:credentials[auth_key] for auth_key in ['user', 'password', 'authenticator'] if auth_key in credentials}
+            # Pull all of the optional authentication args for the connector,
+            # let connector handle the actual arg validation
+            auth_args = {auth_key: credentials[auth_key]
+                         for auth_key in ['user', 'password', 'authenticator']
+                         if auth_key in credentials}
             handle = snowflake.connector.connect(
                 account=credentials.account,
                 database=credentials.database,

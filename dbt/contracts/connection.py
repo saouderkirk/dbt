@@ -89,12 +89,6 @@ SNOWFLAKE_CREDENTIALS_CONTRACT = {
     'type': 'object',
     'additionalProperties': False,
     'properties': {
-         'method': {
-            'enum': ['database', 'oauth', 'oauth_externalbrowser'],
-            'description': (
-                'database: use user/pass creds; oauth use oauth user/pass creds; oauth_externalbrowser no pass required'
-            ),
-        },
         'account': {
             'type': 'string',
         },
@@ -105,7 +99,8 @@ SNOWFLAKE_CREDENTIALS_CONTRACT = {
             'type': 'string',
         },
         'authenticator': {
-            'type': 'string'
+            'type': 'string',
+            'description': "Either 'externalbrowser', or a valid Okta url"
         },
         'database': {
             'type': 'string',

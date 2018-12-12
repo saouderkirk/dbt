@@ -11,6 +11,7 @@ from snowflake import connector as snowflake_connector
 
 from .utils import config_from_parts_or_dicts
 
+
 class TestSnowflakeAdapter(unittest.TestCase):
     def setUp(self):
         flags.STRICT_MODE = False
@@ -41,10 +42,12 @@ class TestSnowflakeAdapter(unittest.TestCase):
         }
         self.config = config_from_parts_or_dicts(project_cfg, profile_cfg)
 
-        self.handle = mock.MagicMock(spec=snowflake_connector.SnowflakeConnection)
+        self.handle = mock.MagicMock(
+            spec=snowflake_connector.SnowflakeConnection)
         self.cursor = self.handle.cursor.return_value
         self.mock_execute = self.cursor.execute
-        self.patcher = mock.patch('dbt.adapters.snowflake.impl.snowflake.connector.connect')
+        self.patcher = mock.patch(
+            'dbt.adapters.snowflake.impl.snowflake.connector.connect')
         self.snowflake = self.patcher.start()
 
         self.snowflake.return_value = self.handle
@@ -72,7 +75,9 @@ class TestSnowflakeAdapter(unittest.TestCase):
             relation_type='table'
         )
         self.mock_execute.assert_has_calls([
-            mock.call('drop table if exists "test_schema".test_table cascade', None)
+            mock.call(
+                'drop table if exists "test_schema".test_table cascade',
+                None)
         ])
 
     def test_quoting_on_truncate(self):
@@ -91,7 +96,9 @@ class TestSnowflakeAdapter(unittest.TestCase):
             to_name='table_b'
         )
         self.mock_execute.assert_has_calls([
-            mock.call('alter table "test_schema".table_a rename to table_b', None)
+            mock.call(
+                'alter table "test_schema".table_a rename to table_b',
+                None)
         ])
 
     def test_client_session_keep_alive_false_by_default(self):
@@ -99,7 +106,7 @@ class TestSnowflakeAdapter(unittest.TestCase):
             mock.call(
                 account='test_account', autocommit=False,
                 client_session_keep_alive=False, database='test_databse',
-                role=None, schema='public', user='test_user', 
+                role=None, schema='public', user='test_user',
                 warehouse='test_warehouse')
         ])
 
@@ -112,11 +119,10 @@ class TestSnowflakeAdapter(unittest.TestCase):
         self.snowflake.assert_has_calls([
             mock.call(
                 account='test_account', autocommit=False,
-                client_session_keep_alive=True, database='test_databse', 
-                role=None, schema='public', user='test_user', 
+                client_session_keep_alive=True, database='test_databse',
+                role=None, schema='public', user='test_user',
                 warehouse='test_warehouse')
         ])
-
 
     def test_user_pass_authentication(self):
         self.config.credentials = self.config.credentials.incorporate(
@@ -146,8 +152,10 @@ class TestSnowflakeAdapter(unittest.TestCase):
                 user='test_user', warehouse='test_warehouse',
                 authenticator='test_sso_url')
         ])
+
     def test_authenticator_externalbrowser_authentication(self):
-        self.config.credentials = self.config.credentials.incorporate(authenticator='externalbrowser')
+        self.config.credentials = self.config.credentials.incorporate(
+            authenticator='externalbrowser')
         self.adapter = SnowflakeAdapter(self.config)
         self.adapter.get_connection(name='new_connection_with_new_config')
 
@@ -155,6 +163,6 @@ class TestSnowflakeAdapter(unittest.TestCase):
             mock.call(
                 account='test_account', autocommit=False,
                 client_session_keep_alive=False, database='test_databse',
-                role=None, schema='public', user='test_user', 
+                role=None, schema='public', user='test_user',
                 warehouse='test_warehouse', authenticator='externalbrowser')
         ])

@@ -80,6 +80,9 @@ CONFIG_CONTRACT = {
                 }
             ]
         },
+        'on_schema_change': {
+            'type': 'string'
+        }
     },
     'required': [
         'enabled', 'materialized', 'post-hook', 'pre-hook', 'vars',

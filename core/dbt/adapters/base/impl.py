@@ -478,6 +478,15 @@ class BaseAdapter(object):
         )
 
     @abc.abstractmethod
+    def has_schema_changed(self, goal, current):
+        """ This can be sepearater methods for each way the scheam can differ, but
+        for right now just combine them as a default
+        """
+        raise dbt.exceptions.NotImplementedException(
+                '`has_schema_changed` is not implemented for this adapter!'
+        )
+
+    @abc.abstractmethod
     def list_relations_without_caching(self, information_schema, schema):
         """List relations in the given schema, bypassing the cache.
 
@@ -592,6 +601,24 @@ class BaseAdapter(object):
             quote_policy=self.config.quoting
         )
         self.expand_column_types(goal, to_relation)
+
+    @available
+    def target_contains_schema_change(self, old_relation, to_relation):
+        if not isinstance(to_relation, self.Relation):
+            dbt.exceptions.invalid_type_error(
+                method_name='target_contains_schema_change',
+                arg_name='to_relation',
+                got_value=to_relation,
+                expected_type=self.Relation)
+
+        if not isinstance(old_relation, self.Relation):
+            dbt.exceptions.invalid_type_error(
+                method_name='target_contains_schema_change',
+                arg_name='old_relation',
+                got_value=old_relation,
+                expected_type=self.Relation)
+
+        return self.has_schema_changed(old_relation, to_relation)
 
     def list_relations(self, database, schema):
         if self._schema_is_cached(database, schema):

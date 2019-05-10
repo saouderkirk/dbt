@@ -11,6 +11,20 @@
 
 {%- endmacro %}
 
+-- Ideally, you should be able to override this macro to define what you want to consider a schema change. The default is to
+-- look at the following between the new relation and the old relation:
+--    1. Addition of new column
+--    2. Deletion of column
+--    3. Rename of column
+--    4. Changing of column data type
+{% macro dbt__default_has_schema_changed(on_schema_change_fail, old_relation, target_relation) -%}
+
+{% if on_schema_change_fail and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) -%}
+  {{ exceptions.raise_fail_on_schema_change() }}
+{%- endif %}
+
+{%- endmacro %}
+
 {% materialization incremental, default -%}
   {%- set unique_key = config.get('unique_key') -%}
 
@@ -24,6 +38,8 @@
                                              database=database, type='table') -%}
 
   {%- set full_refresh_mode = (flags.FULL_REFRESH == True) -%}
+
+  {%- set on_schema_change_fail = (config.get('on_schema_change') == 'fail') -%}
 
   {%- set exists_as_table = (old_relation is not none and old_relation.is_table) -%}
   {%- set exists_not_as_table = (old_relation is not none and not old_relation.is_table) -%}
@@ -54,6 +70,8 @@
        {{ dbt.create_table_as(True, tmp_relation, sql) }}
 
      {%- endcall -%}
+
+     {{ dbt__default_has_schema_changed(on_schema_change_fail, old_relation, tmp_relation) }}
 
      {{ adapter.expand_target_column_types(temp_table=tmp_identifier,
                                            to_relation=target_relation) }}

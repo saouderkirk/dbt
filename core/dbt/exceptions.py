@@ -243,6 +243,10 @@ class FailedToConnectException(DatabaseException):
     pass
 
 
+class SchemaChangeException(RuntimeException):
+    CODE=1008
+
+
 class CommandError(RuntimeException):
     def __init__(self, cwd, cmd, message='Error running command'):
         super(CommandError, self).__init__(message)
@@ -651,6 +655,10 @@ def raise_unrecognized_credentials_type(typename, supported_types):
 def raise_not_implemented(msg):
     raise NotImplementedException(msg)
 
+def raise_fail_on_schema_change():
+    MESSAGE="Schema change detected and configuration of on_schema_change set to 'fail'"
+    raise SchemaChangeException(MESSAGE)
+
 
 def warn_or_error(msg, node=None, log_fmt=None):
     if dbt.flags.WARN_ERROR:
@@ -681,6 +689,7 @@ CONTEXT_EXPORTS = {
         raise_duplicate_resource_name,
         raise_invalid_schema_yml_version,
         relation_wrong_type,
+        raise_fail_on_schema_change,
     ]
 }
 

@@ -9,7 +9,7 @@ class TestStatements(DBTIntegrationTest):
 
     @staticmethod
     def dir(path):
-        return "test/integration/030_statement_test/" + path.lstrip("/")
+        return path.lstrip("/")
 
     @property
     def models(self):
@@ -37,6 +37,16 @@ class TestStatements(DBTIntegrationTest):
 
         self.assertManyTablesEqual(["STATEMENT_ACTUAL", "STATEMENT_EXPECTED"])
 
+    @use_profile("presto")
+    def test_presto_statements(self):
+        self.use_default_project({"data-paths": [self.dir("seed")]})
+
+        results = self.run_dbt(["seed"])
+        self.assertEqual(len(results), 2)
+        results = self.run_dbt()
+        self.assertEqual(len(results), 1)
+
+        self.assertTablesEqual("statement_actual","statement_expected")
 
 class TestStatementsBigquery(DBTIntegrationTest):
 
@@ -46,7 +56,7 @@ class TestStatementsBigquery(DBTIntegrationTest):
 
     @staticmethod
     def dir(path):
-        return "test/integration/030_statement_test/" + path.lstrip("/")
+        return path.lstrip("/")
 
     @property
     def models(self):

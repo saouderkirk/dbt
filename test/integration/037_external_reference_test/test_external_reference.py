@@ -7,7 +7,7 @@ class TestExternalReference(DBTIntegrationTest):
 
     @property
     def models(self):
-        return "test/integration/037_external_reference_test/models"
+        return "models"
 
     def setUp(self):
         super(TestExternalReference, self).setUp()
@@ -28,15 +28,17 @@ class TestExternalReference(DBTIntegrationTest):
     def tearDown(self):
         # This has to happen before we drop the external schema, because
         # otherwise postgres hangs forever.
-        self._drop_schema()
-        self.adapter.drop_schema(self.external_schema, '__test')
+        self._drop_schemas()
+        with self.get_connection():
+            self.adapter.drop_schema(self.default_database, self.external_schema)
         super(TestExternalReference, self).tearDown()
 
     @use_profile('postgres')
     def test__postgres__external_reference(self):
-        self.assertEquals(len(self.run_dbt()), 1)
+        self.assertEqual(len(self.run_dbt()), 1)
         # running it again should succeed
-        self.assertEquals(len(self.run_dbt()), 1)
+        self.assertEqual(len(self.run_dbt()), 1)
+
 
 # The opposite of the test above -- check that external relations that
 # depend on a dbt model do not create issues with caching
@@ -47,18 +49,19 @@ class TestExternalDependency(DBTIntegrationTest):
 
     @property
     def models(self):
-        return "test/integration/037_external_reference_test/standalone_models"
+        return "standalone_models"
 
     def tearDown(self):
         # This has to happen before we drop the external schema, because
         # otherwise postgres hangs forever.
-        self._drop_schema()
-        self.adapter.drop_schema(self.external_schema, '__test')
+        self._drop_schemas()
+        with self.get_connection():
+            self.adapter.drop_schema(self.default_database, self.external_schema)
         super(TestExternalDependency, self).tearDown()
 
     @use_profile('postgres')
     def test__postgres__external_reference(self):
-        self.assertEquals(len(self.run_dbt()), 1)
+        self.assertEqual(len(self.run_dbt()), 1)
 
         # create a view outside of the dbt schema that depends on this model
         self.external_schema = self.unique_schema()+'zz'
@@ -71,5 +74,5 @@ class TestExternalDependency(DBTIntegrationTest):
         )
 
         # running it again should succeed
-        self.assertEquals(len(self.run_dbt()), 1)
+        self.assertEqual(len(self.run_dbt()), 1)
 

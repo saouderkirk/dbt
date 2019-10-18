@@ -1,7 +1,7 @@
 
 {{
     config({
-        "pre-hook": "\
+        "pre_hook": "\
             insert into {{this.schema}}.on_model_hook (\
                 \"state\",\
                 \"target.dbname\",\
@@ -23,7 +23,7 @@
                 '{{ target.schema }}',\
                 '{{ target.type }}',\
                 '{{ target.user }}',\
-                '{{ target.pass }}',\
+                '{{ target.get(\"pass\", \"\") }}',\
                 {{ target.port }},\
                 {{ target.threads }},\
                 '{{ run_started_at }}',\
@@ -51,7 +51,7 @@
                 '{{ target.schema }}',\
                 '{{ target.type }}',\
                 '{{ target.user }}',\
-                '{{ target.pass }}',\
+                '{{ target.get(\"pass\", \"\") }}',\
                 {{ target.port }},\
                 {{ target.threads }},\
                 '{{ run_started_at }}',\

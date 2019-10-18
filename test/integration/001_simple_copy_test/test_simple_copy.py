@@ -1,16 +1,14 @@
-from nose.plugins.attrib import attr
 from test.integration.base import DBTIntegrationTest, use_profile
 
 
 class BaseTestSimpleCopy(DBTIntegrationTest):
-
     @property
     def schema(self):
         return "simple_copy_001"
 
     @staticmethod
     def dir(path):
-        return "test/integration/001_simple_copy_test/" + path.lstrip("/")
+        return path.lstrip('/')
 
     @property
     def models(self):
@@ -18,6 +16,7 @@ class BaseTestSimpleCopy(DBTIntegrationTest):
 
 
 class TestSimpleCopy(BaseTestSimpleCopy):
+
     @use_profile("postgres")
     def test__postgres__simple_copy(self):
         self.use_default_project({"data-paths": [self.dir("seed-initial")]})
@@ -25,17 +24,17 @@ class TestSimpleCopy(BaseTestSimpleCopy):
         results = self.run_dbt(["seed"])
         self.assertEqual(len(results),  1)
         results = self.run_dbt()
-        self.assertEqual(len(results),  6)
+        self.assertEqual(len(results),  7)
 
-        self.assertManyTablesEqual(["seed", "view_model", "incremental", "materialized"])
+        self.assertManyTablesEqual(["seed", "view_model", "incremental", "materialized", "get_and_ref"])
 
         self.use_default_project({"data-paths": [self.dir("seed-update")]})
         results = self.run_dbt(["seed"])
         self.assertEqual(len(results),  1)
         results = self.run_dbt()
-        self.assertEqual(len(results),  6)
+        self.assertEqual(len(results),  7)
 
-        self.assertManyTablesEqual(["seed", "view_model", "incremental", "materialized"])
+        self.assertManyTablesEqual(["seed", "view_model", "incremental", "materialized", "get_and_ref"])
 
     @use_profile("postgres")
     def test__postgres__dbt_doesnt_run_empty_models(self):
@@ -44,27 +43,51 @@ class TestSimpleCopy(BaseTestSimpleCopy):
         results = self.run_dbt(["seed"])
         self.assertEqual(len(results),  1)
         results = self.run_dbt()
-        self.assertEqual(len(results),  6)
+        self.assertEqual(len(results),  7)
 
         models = self.get_models_in_schema()
 
         self.assertFalse("empty" in models.keys())
         self.assertFalse("disabled" in models.keys())
 
+    @use_profile("presto")
+    def test__presto__simple_copy(self):
+        self.use_default_project({"data-paths": [self.dir("seed-initial")]})
+
+        results = self.run_dbt(["seed"])
+        self.assertEqual(len(results),  1)
+        results = self.run_dbt(expect_pass=False)
+        self.assertEqual(len(results),  7)
+        for result in results:
+            if 'incremental' in result.node.name:
+                self.assertIn('not implemented for presto', result.error)
+
+        self.assertManyTablesEqual(["seed", "view_model", "materialized"])
+
     @use_profile("snowflake")
     def test__snowflake__simple_copy(self):
         self.use_default_project({"data-paths": [self.dir("seed-initial")]})
 
-        self.run_dbt(["seed"])
-        self.run_dbt()
+        results = self.run_dbt(["seed"])
+        self.assertEqual(len(results),  1)
+        results = self.run_dbt()
+        self.assertEqual(len(results),  7)
 
-        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED"])
+        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED", "GET_AND_REF"])
 
         self.use_default_project({"data-paths": [self.dir("seed-update")]})
-        self.run_dbt(["seed"])
-        self.run_dbt()
+        results = self.run_dbt(["seed"])
+        self.assertEqual(len(results),  1)
+        results = self.run_dbt()
+        self.assertEqual(len(results),  7)
 
-        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED"])
+        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED", "GET_AND_REF"])
+
+        self.use_default_project({
+            "test-paths": [self.dir("tests")],
+            "data-paths": [self.dir("seed-update")],
+        })
+        self.run_dbt(['test'])
 
     @use_profile("snowflake")
     def test__snowflake__simple_copy__quoting_off(self):
@@ -76,9 +99,9 @@ class TestSimpleCopy(BaseTestSimpleCopy):
         results = self.run_dbt(["seed"])
         self.assertEqual(len(results),  1)
         results = self.run_dbt()
-        self.assertEqual(len(results),  6)
+        self.assertEqual(len(results),  7)
 
-        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED"])
+        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED", "GET_AND_REF"])
 
         self.use_default_project({
             "data-paths": [self.dir("seed-update")],
@@ -87,9 +110,16 @@ class TestSimpleCopy(BaseTestSimpleCopy):
         results = self.run_dbt(["seed"])
         self.assertEqual(len(results),  1)
         results = self.run_dbt()
-        self.assertEqual(len(results),  6)
+        self.assertEqual(len(results),  7)
 
-        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED"])
+        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED", "GET_AND_REF"])
+
+        self.use_default_project({
+            "test-paths": [self.dir("tests")],
+            "data-paths": [self.dir("seed-update")],
+            "quoting": {"identifier": False},
+        })
+        self.run_dbt(['test'])
 
     @use_profile("snowflake")
     def test__snowflake__seed__quoting_switch(self):
@@ -107,6 +137,12 @@ class TestSimpleCopy(BaseTestSimpleCopy):
         })
         results = self.run_dbt(["seed"], expect_pass=False)
 
+        self.use_default_project({
+            "test-paths": [self.dir("tests")],
+            "data-paths": [self.dir("seed-initial")],
+        })
+        self.run_dbt(['test'])
+
     @use_profile("bigquery")
     def test__bigquery__simple_copy(self):
         self.use_default_project({"data-paths": [self.dir("seed-initial")]})
@@ -114,22 +150,24 @@ class TestSimpleCopy(BaseTestSimpleCopy):
         results = self.run_dbt(["seed"])
         self.assertEqual(len(results),  1)
         results = self.run_dbt()
-        self.assertEqual(len(results),  6)
+        self.assertEqual(len(results),  7)
 
-        self.assertTablesEqual("seed","view_model")
-        self.assertTablesEqual("seed","incremental")
-        self.assertTablesEqual("seed","materialized")
+        self.assertTablesEqual("seed", "view_model")
+        self.assertTablesEqual("seed", "incremental")
+        self.assertTablesEqual("seed", "materialized")
+        self.assertTablesEqual("seed", "get_and_ref")
 
         self.use_default_project({"data-paths": [self.dir("seed-update")]})
 
         results = self.run_dbt(["seed"])
         self.assertEqual(len(results),  1)
         results = self.run_dbt()
-        self.assertEqual(len(results),  6)
+        self.assertEqual(len(results),  7)
 
-        self.assertTablesEqual("seed","view_model")
-        self.assertTablesEqual("seed","incremental")
-        self.assertTablesEqual("seed","materialized")
+        self.assertTablesEqual("seed", "view_model")
+        self.assertTablesEqual("seed", "incremental")
+        self.assertTablesEqual("seed", "materialized")
+        self.assertTablesEqual("seed", "get_and_ref")
 
 
 class TestSimpleCopyQuotingIdentifierOn(BaseTestSimpleCopy):
@@ -150,9 +188,9 @@ class TestSimpleCopyQuotingIdentifierOn(BaseTestSimpleCopy):
         results = self.run_dbt(["seed"])
         self.assertEqual(len(results),  1)
         results = self.run_dbt()
-        self.assertEqual(len(results),  6)
+        self.assertEqual(len(results),  7)
 
-        self.assertManyTablesEqual(["seed", "view_model", "incremental", "materialized"])
+        self.assertManyTablesEqual(["seed", "view_model", "incremental", "materialized", "get_and_ref"])
 
         self.use_default_project({
             "data-paths": [self.dir("seed-update")],
@@ -160,9 +198,11 @@ class TestSimpleCopyQuotingIdentifierOn(BaseTestSimpleCopy):
         results = self.run_dbt(["seed"])
         self.assertEqual(len(results),  1)
         results = self.run_dbt()
-        self.assertEqual(len(results),  6)
+        self.assertEqual(len(results),  7)
 
-        self.assertManyTablesEqual(["seed", "view_model", "incremental", "materialized"])
+        self.assertManyTablesEqual(["seed", "view_model", "incremental", "materialized", "get_and_ref"])
+
+        # can't run the test as this one's identifiers will be the wrong case
 
 
 class BaseLowercasedSchemaTest(BaseTestSimpleCopy):
@@ -177,16 +217,27 @@ class TestSnowflakeSimpleLowercasedSchemaCopy(BaseLowercasedSchemaTest):
     def test__snowflake__simple_copy(self):
         self.use_default_project({"data-paths": [self.dir("seed-initial")]})
 
-        self.run_dbt(["seed"])
-        self.run_dbt()
+        results = self.run_dbt(["seed"])
+        self.assertEqual(len(results),  1)
+        results = self.run_dbt()
+        self.assertEqual(len(results),  7)
 
-        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED"])
+        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED", "GET_AND_REF"])
 
         self.use_default_project({"data-paths": [self.dir("seed-update")]})
-        self.run_dbt(["seed"])
-        self.run_dbt()
 
-        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED"])
+        results = self.run_dbt(["seed"])
+        self.assertEqual(len(results),  1)
+        results = self.run_dbt()
+        self.assertEqual(len(results),  7)
+
+        self.assertManyTablesEqual(["SEED", "VIEW_MODEL", "INCREMENTAL", "MATERIALIZED", "GET_AND_REF"])
+
+        self.use_default_project({
+            "test-paths": [self.dir("tests")],
+            "data-paths": [self.dir("seed-update")],
+        })
+        self.run_dbt(['test'])
 
 
 class TestSnowflakeSimpleLowercasedSchemaQuoted(BaseLowercasedSchemaTest):
@@ -210,3 +261,27 @@ class TestSnowflakeSimpleLowercasedSchemaQuoted(BaseLowercasedSchemaTest):
             "quoting": {"identifier": False, "schema": False},
         })
         results = self.run_dbt(["seed"], expect_pass=False)
+
+
+class TestSnowflakeIncrementalOverwrite(BaseTestSimpleCopy):
+    @property
+    def models(self):
+        return self.dir("models-snowflake")
+
+    @use_profile("snowflake")
+    def test__snowflake__incremental_overwrite(self):
+        results = self.run_dbt(["run"])
+        self.assertEqual(len(results),  1)
+
+        results = self.run_dbt(["run"], expect_pass=False)
+        self.assertEqual(len(results),  1)
+
+        # Setting the incremental_strategy should make this succeed
+        self.use_default_project({
+            "models": {"incremental_strategy": "delete+insert"}
+        })
+
+        results = self.run_dbt(["run"])
+        self.assertEqual(len(results),  1)
+
+

@@ -21,6 +21,7 @@ class ManifestTest(unittest.TestCase):
         self.model_config = {
             'enabled': True,
             'materialized': 'view',
+            'persist_docs': {},
             'post-hook': [],
             'pre-hook': [],
             'vars': {},
@@ -32,6 +33,7 @@ class ManifestTest(unittest.TestCase):
         self.nested_nodes = {
             'model.snowplow.events': ParsedNode(
                 name='events',
+                database='dbt',
                 schema='analytics',
                 alias='events',
                 resource_type='model',
@@ -40,6 +42,7 @@ class ManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='snowplow',
                 refs=[],
+                sources=[],
                 depends_on={
                     'nodes': [],
                     'macros': []
@@ -53,6 +56,7 @@ class ManifestTest(unittest.TestCase):
             ),
             'model.root.events': ParsedNode(
                 name='events',
+                database='dbt',
                 schema='analytics',
                 alias='events',
                 resource_type='model',
@@ -61,6 +65,7 @@ class ManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[],
+                sources=[],
                 depends_on={
                     'nodes': [],
                     'macros': []
@@ -74,6 +79,7 @@ class ManifestTest(unittest.TestCase):
             ),
             'model.root.dep': ParsedNode(
                 name='dep',
+                database='dbt',
                 schema='analytics',
                 alias='dep',
                 resource_type='model',
@@ -82,6 +88,7 @@ class ManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[['events']],
+                sources=[],
                 depends_on={
                     'nodes': ['model.root.events'],
                     'macros': []
@@ -95,6 +102,7 @@ class ManifestTest(unittest.TestCase):
             ),
             'model.root.nested': ParsedNode(
                 name='nested',
+                database='dbt',
                 schema='analytics',
                 alias='nested',
                 resource_type='model',
@@ -103,6 +111,7 @@ class ManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[['events']],
+                sources=[],
                 depends_on={
                     'nodes': ['model.root.dep'],
                     'macros': []
@@ -116,6 +125,7 @@ class ManifestTest(unittest.TestCase):
             ),
             'model.root.sibling': ParsedNode(
                 name='sibling',
+                database='dbt',
                 schema='analytics',
                 alias='sibling',
                 resource_type='model',
@@ -124,6 +134,7 @@ class ManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[['events']],
+                sources=[],
                 depends_on={
                     'nodes': ['model.root.events'],
                     'macros': []
@@ -137,6 +148,7 @@ class ManifestTest(unittest.TestCase):
             ),
             'model.root.multi': ParsedNode(
                 name='multi',
+                database='dbt',
                 schema='analytics',
                 alias='multi',
                 resource_type='model',
@@ -145,6 +157,7 @@ class ManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[['events']],
+                sources=[],
                 depends_on={
                     'nodes': ['model.root.nested', 'model.root.sibling'],
                     'macros': []
@@ -245,19 +258,6 @@ class ManifestTest(unittest.TestCase):
             []
         )
 
-    def test__to_flat_graph(self):
-        nodes = copy.copy(self.nested_nodes)
-        manifest = Manifest(nodes=nodes, macros={}, docs={},
-                            generated_at=timestring(), disabled=[])
-        flat_graph = manifest.to_flat_graph()
-        flat_nodes = flat_graph['nodes']
-        self.assertEqual(set(flat_graph), set(['nodes', 'macros']))
-        self.assertEqual(flat_graph['macros'], {})
-        self.assertEqual(set(flat_nodes), set(self.nested_nodes))
-        expected_keys = set(ParsedNode.SCHEMA['required']) | {'agate_table'}
-        for node in flat_nodes.values():
-            self.assertEqual(set(node), expected_keys)
-
     @mock.patch.object(tracking, 'active_user')
     def test_get_metadata(self, mock_user):
         mock_user.id = 'cfc9500f-dc7f-4c83-9ea7-2c581c1b38cf'
@@ -317,24 +317,26 @@ class ManifestTest(unittest.TestCase):
         nodes = copy.copy(self.nested_nodes)
         nodes['seed.root.seed'] = ParsedNode(
             name='seed',
+            database='dbt',
             schema='analytics',
-                alias='seed',
-                resource_type='seed',
-                unique_id='seed.root.seed',
-                fqn=['root', 'seed'],
-                empty=False,
-                package_name='root',
-                refs=[['events']],
-                depends_on={
-                    'nodes': [],
-                    'macros': []
-                },
-                config=self.model_config,
-                tags=[],
-                path='seed.csv',
-                original_file_path='seed.csv',
-                root_path='',
-                raw_sql='-- csv --'
+            alias='seed',
+            resource_type='seed',
+            unique_id='seed.root.seed',
+            fqn=['root', 'seed'],
+            empty=False,
+            package_name='root',
+            refs=[['events']],
+            sources=[],
+            depends_on={
+                'nodes': [],
+                'macros': []
+            },
+            config=self.model_config,
+            tags=[],
+            path='seed.csv',
+            original_file_path='seed.csv',
+            root_path='',
+            raw_sql='-- csv --'
         )
         manifest = Manifest(nodes=nodes, macros={}, docs={},
                             generated_at=timestring(), disabled=[])
@@ -362,6 +364,7 @@ class MixedManifestTest(unittest.TestCase):
         self.model_config = {
             'enabled': True,
             'materialized': 'view',
+            'persist_docs': {},
             'post-hook': [],
             'pre-hook': [],
             'vars': {},
@@ -373,6 +376,7 @@ class MixedManifestTest(unittest.TestCase):
         self.nested_nodes = {
             'model.snowplow.events': CompiledNode(
                 name='events',
+                database='dbt',
                 schema='analytics',
                 alias='events',
                 resource_type='model',
@@ -381,6 +385,7 @@ class MixedManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='snowplow',
                 refs=[],
+                sources=[],
                 depends_on={
                     'nodes': [],
                     'macros': []
@@ -399,6 +404,7 @@ class MixedManifestTest(unittest.TestCase):
             ),
             'model.root.events': CompiledNode(
                 name='events',
+                database='dbt',
                 schema='analytics',
                 alias='events',
                 resource_type='model',
@@ -407,6 +413,7 @@ class MixedManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[],
+                sources=[],
                 depends_on={
                     'nodes': [],
                     'macros': []
@@ -425,6 +432,7 @@ class MixedManifestTest(unittest.TestCase):
             ),
             'model.root.dep': ParsedNode(
                 name='dep',
+                database='dbt',
                 schema='analytics',
                 alias='dep',
                 resource_type='model',
@@ -433,6 +441,7 @@ class MixedManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[['events']],
+                sources=[],
                 depends_on={
                     'nodes': ['model.root.events'],
                     'macros': []
@@ -446,6 +455,7 @@ class MixedManifestTest(unittest.TestCase):
             ),
             'model.root.nested': ParsedNode(
                 name='nested',
+                database='dbt',
                 schema='analytics',
                 alias='nested',
                 resource_type='model',
@@ -454,6 +464,7 @@ class MixedManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[['events']],
+                sources=[],
                 depends_on={
                     'nodes': ['model.root.dep'],
                     'macros': []
@@ -467,6 +478,7 @@ class MixedManifestTest(unittest.TestCase):
             ),
             'model.root.sibling': ParsedNode(
                 name='sibling',
+                database='dbt',
                 schema='analytics',
                 alias='sibling',
                 resource_type='model',
@@ -475,6 +487,7 @@ class MixedManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[['events']],
+                sources=[],
                 depends_on={
                     'nodes': ['model.root.events'],
                     'macros': []
@@ -488,6 +501,7 @@ class MixedManifestTest(unittest.TestCase):
             ),
             'model.root.multi': ParsedNode(
                 name='multi',
+                database='dbt',
                 schema='analytics',
                 alias='multi',
                 resource_type='model',
@@ -496,6 +510,7 @@ class MixedManifestTest(unittest.TestCase):
                 empty=False,
                 package_name='root',
                 refs=[['events']],
+                sources=[],
                 depends_on={
                     'nodes': ['model.root.nested', 'model.root.sibling'],
                     'macros': []
@@ -594,23 +609,3 @@ class MixedManifestTest(unittest.TestCase):
             child_map['model.snowplow.events'],
             []
         )
-
-    def test__to_flat_graph(self):
-        nodes = copy.copy(self.nested_nodes)
-        manifest = Manifest(nodes=nodes, macros={}, docs={},
-                            generated_at=timestring(), disabled=[])
-        flat_graph = manifest.to_flat_graph()
-        flat_nodes = flat_graph['nodes']
-        self.assertEqual(set(flat_graph), set(['nodes', 'macros']))
-        self.assertEqual(flat_graph['macros'], {})
-        self.assertEqual(set(flat_nodes), set(self.nested_nodes))
-        parsed_keys = set(ParsedNode.SCHEMA['required']) | {'agate_table'}
-        compiled_keys = set(CompiledNode.SCHEMA['required']) | {'agate_table'}
-        compiled_count = 0
-        for node in flat_nodes.values():
-            if node.get('compiled'):
-                self.assertEqual(set(node), compiled_keys)
-                compiled_count += 1
-            else:
-                self.assertEqual(set(node), parsed_keys)
-        self.assertEqual(compiled_count, 2)

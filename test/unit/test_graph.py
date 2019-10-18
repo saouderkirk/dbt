@@ -1,4 +1,4 @@
-from mock import MagicMock
+from mock import MagicMock, patch
 import os
 import six
 import unittest
@@ -8,10 +8,15 @@ import dbt.compilation
 import dbt.exceptions
 import dbt.flags
 import dbt.linker
-import dbt.model
 import dbt.config
-import dbt.templates
 import dbt.utils
+import dbt.loader
+
+try:
+    from queue import Empty
+except ImportError:
+    from Queue import Empty
+
 
 import networkx as nx
 
@@ -23,28 +28,34 @@ from .utils import config_from_parts_or_dicts
 class GraphTest(unittest.TestCase):
 
     def tearDown(self):
-        nx.write_gpickle = self.real_write_gpickle
-        dbt.utils.dependency_projects = self.real_dependency_projects
-        dbt.clients.system.find_matching = self.real_find_matching
-        dbt.clients.system.load_file_contents = self.real_load_file_contents
+        self.write_gpickle_patcher.stop()
+        self.load_projects_patcher.stop()
+        self.find_matching_patcher.stop()
+        self.load_file_contents_patcher.stop()
+        self.get_adapter_patcher.stop()
 
     def setUp(self):
         dbt.flags.STRICT_MODE = True
+        self.graph_result = None
+
+        self.write_gpickle_patcher = patch('networkx.write_gpickle')
+        self.load_projects_patcher = patch('dbt.loader._load_projects')
+        self.find_matching_patcher = patch('dbt.clients.system.find_matching')
+        self.load_file_contents_patcher = patch('dbt.clients.system.load_file_contents')
+        self.get_adapter_patcher = patch('dbt.context.parser.get_adapter')
+        self.factory = self.get_adapter_patcher.start()
 
         def mock_write_gpickle(graph, outfile):
             self.graph_result = graph
-
-        self.real_write_gpickle = nx.write_gpickle
-        nx.write_gpickle = mock_write_gpickle
-
-        self.graph_result = None
+        self.mock_write_gpickle = self.write_gpickle_patcher.start()
+        self.mock_write_gpickle.side_effect = mock_write_gpickle
 
         self.profile = {
             'outputs': {
                 'test': {
                     'type': 'postgres',
                     'threads': 4,
-                    'host': 'database',
+                    'host': 'thishostshouldnotexist',
                     'port': 5432,
                     'user': 'root',
                     'pass': 'password',
@@ -55,14 +66,13 @@ class GraphTest(unittest.TestCase):
             'target': 'test'
         }
 
-        self.real_dependency_projects = dbt.utils.dependency_projects
-        dbt.utils.dependency_projects = MagicMock(return_value=[])
+        self.mock_load_projects = self.load_projects_patcher.start()
+        self.mock_load_projects.return_value = []
 
         self.mock_models = []
         self.mock_content = {}
 
-        def mock_find_matching(root_path, relative_paths_to_search,
-                               file_pattern):
+        def mock_find_matching(root_path, relative_paths_to_search, file_pattern):
             if 'sql' not in file_pattern:
                 return []
 
@@ -73,16 +83,14 @@ class GraphTest(unittest.TestCase):
 
             return to_return
 
-        self.real_find_matching = dbt.clients.system.find_matching
-        dbt.clients.system.find_matching = MagicMock(
-            side_effect=mock_find_matching)
+        self.mock_find_matching = self.find_matching_patcher.start()
+        self.mock_find_matching.side_effect = mock_find_matching
 
         def mock_load_file_contents(path):
             return self.mock_content[path]
 
-        self.real_load_file_contents = dbt.clients.system.load_file_contents
-        dbt.clients.system.load_file_contents = MagicMock(
-            side_effect=mock_load_file_contents)
+        self.mock_load_file_contents = self.load_file_contents_patcher.start()
+        self.mock_load_file_contents.side_effect = mock_load_file_contents
 
     def get_config(self, extra_cfg=None):
         if extra_cfg is None:
@@ -115,15 +123,17 @@ class GraphTest(unittest.TestCase):
             'model_one': 'select * from events',
         })
 
-        compiler = self.get_compiler(self.get_config())
-        graph, linker = compiler.compile()
+        config = self.get_config()
+        manifest = dbt.loader.GraphLoader.load_all(config)
+        compiler = self.get_compiler(config)
+        linker = compiler.compile(manifest)
 
-        self.assertEquals(
-            linker.nodes(),
+        self.assertEqual(
+            list(linker.nodes()),
             ['model.test_models_compile.model_one'])
 
-        self.assertEquals(
-            linker.edges(),
+        self.assertEqual(
+            list(linker.edges()),
             [])
 
     def test__two_models_simple_ref(self):
@@ -132,8 +142,10 @@ class GraphTest(unittest.TestCase):
             'model_two': "select * from {{ref('model_one')}}",
         })
 
-        compiler = self.get_compiler(self.get_config())
-        graph, linker = compiler.compile()
+        config = self.get_config()
+        manifest = dbt.loader.GraphLoader.load_all(config)
+        compiler = self.get_compiler(config)
+        linker = compiler.compile(manifest)
 
         six.assertCountEqual(self,
                              linker.nodes(),
@@ -166,8 +178,10 @@ class GraphTest(unittest.TestCase):
             }
         }
 
-        compiler = self.get_compiler(self.get_config(cfg))
-        graph, linker = compiler.compile()
+        config = self.get_config(cfg)
+        manifest = dbt.loader.GraphLoader.load_all(config)
+        compiler = self.get_compiler(config)
+        linker = compiler.compile(manifest)
 
         expected_materialization = {
             "model_one": "table",
@@ -180,9 +194,9 @@ class GraphTest(unittest.TestCase):
 
         for model, expected in expected_materialization.items():
             key = 'model.test_models_compile.{}'.format(model)
-            actual = nodes[key].get('config', {}) \
-                               .get('materialized')
-            self.assertEquals(actual, expected)
+            actual = manifest.nodes[key].get('config', {}) \
+                                             .get('materialized')
+            self.assertEqual(actual, expected)
 
     def test__model_incremental(self):
         self.use_models({
@@ -194,24 +208,26 @@ class GraphTest(unittest.TestCase):
                 "test_models_compile": {
                     "model_one": {
                         "materialized": "incremental",
-                        "sql_where": "created_at",
                         "unique_key": "id"
                     },
                 }
             }
         }
 
-        compiler = self.get_compiler(self.get_config(cfg))
-        graph, linker = compiler.compile()
+        config = self.get_config(cfg)
+        manifest = dbt.loader.GraphLoader.load_all(config)
+        compiler = self.get_compiler(config)
+        linker = compiler.compile(manifest)
 
         node = 'model.test_models_compile.model_one'
 
-        self.assertEqual(linker.nodes(), [node])
-        self.assertEqual(linker.edges(), [])
+        self.assertEqual(list(linker.nodes()), [node])
+        self.assertEqual(list(linker.edges()), [])
 
         self.assertEqual(
-                linker.graph.node[node].get('config', {}).get('materialized'),
-                'incremental')
+            manifest.nodes[node].get('config', {}).get('materialized'),
+            'incremental'
+        )
 
     def test__dependency_list(self):
         self.use_models({
@@ -225,16 +241,25 @@ class GraphTest(unittest.TestCase):
             'model_4': 'select * from {{ ref("model_3") }}'
         })
 
-        compiler = self.get_compiler(self.get_config({}))
-        graph, linker = compiler.compile()
+        config = self.get_config()
+        graph = dbt.loader.GraphLoader.load_all(config)
+        compiler = self.get_compiler(config)
+        linker = compiler.compile(graph)
 
-        actual_dep_list = linker.as_dependency_list()
+        models = ('model_1', 'model_2', 'model_3', 'model_4')
+        model_ids = ['model.test_models_compile.{}'.format(m) for m in models]
 
-        expected_dep_list = [
-            ['model.test_models_compile.model_1'],
-            ['model.test_models_compile.model_2'],
-            ['model.test_models_compile.model_3'],
-            ['model.test_models_compile.model_4'],
-        ]
+        manifest = MagicMock(nodes={
+            n: MagicMock(unique_id=n)
+            for n in model_ids
+        })
+        queue = linker.as_graph_queue(manifest)
 
-        self.assertEqual(actual_dep_list, expected_dep_list)
+        for model_id in model_ids:
+            self.assertFalse(queue.empty())
+            got = queue.get(block=False)
+            self.assertEqual(got.unique_id, model_id)
+            with self.assertRaises(Empty):
+                queue.get(block=False)
+            queue.mark_done(got.unique_id)
+        self.assertTrue(queue.empty())

@@ -41,6 +41,12 @@
 
   {%- set on_schema_change_fail = (config.get('on_schema_change') == 'fail') -%}
 
+  {%- set on_schema_change_full_refresh = (config.get('on_schema_change') == 'full_refresh') -%}
+
+  {% if on_schema_change_full_refresh and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) %}
+    {%- set full_refresh_mode = True -%}
+  {% endif %}
+
   {%- set exists_as_table = (old_relation is not none and old_relation.is_table) -%}
   {%- set exists_not_as_table = (old_relation is not none and not old_relation.is_table) -%}
 

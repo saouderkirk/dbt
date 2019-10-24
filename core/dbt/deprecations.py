@@ -29,18 +29,33 @@ class DBTRepositoriesDeprecation(DBTDeprecation):
   """
 
 
-class SeedDropExistingDeprecation(DBTDeprecation):
-    name = 'drop-existing'
-    description = """The --drop-existing argument to `dbt seed` has been
-  deprecated. Please use --full-refresh instead. The --drop-existing option
-  will be removed in a future version of dbt."""
+class GenerateSchemaNameSingleArgDeprecated(DBTDeprecation):
+    name = 'generate-schema-name-single-arg'
+    description = '''As of dbt v0.14.0, the `generate_schema_name` macro
+  accepts a second "node" argument. The one-argument form of `generate_schema_name`
+  is deprecated, and will become unsupported in a future release.
+
+  For more information, see:
+    https://docs.getdbt.com/v0.14/docs/upgrading-to-014
+  '''  # noqa
+
+
+class ArchiveDeprecated(DBTDeprecation):
+    name = 'archives'
+    description = '''As of dbt v0.14.0, the `dbt archive` command is renamed to
+  `dbt snapshot` and "archives" are "snapshots". The `dbt archive` command will
+  be removed in a future release.
+
+  For more information, see:
+    https://docs.getdbt.com/v0.14/docs/upgrading-to-014
+  '''
 
 
 _adapter_renamed_description = """\
 The adapter function `adapter.{old_name}` is deprecated and will be removed in
  a future release of dbt. Please use `adapter.{new_name}` instead.
  Documentation for {new_name} can be found here:
- https://docs.getdbt.com/reference#adapter"""
+ https://docs.getdbt.com/docs/adapter"""
 
 
 def renamed_method(old_name, new_name):
@@ -71,7 +86,8 @@ active_deprecations = set()
 
 deprecations_list = [
     DBTRepositoriesDeprecation(),
-    SeedDropExistingDeprecation(),
+    GenerateSchemaNameSingleArgDeprecated(),
+    ArchiveDeprecated(),
 ]
 
 deprecations = {d.name: d for d in deprecations_list}

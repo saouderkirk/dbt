@@ -2,7 +2,7 @@ from dbt.api.object import APIObject
 from dbt.logger import GLOBAL_LOGGER as logger  # noqa
 from dbt.utils import deep_merge
 
-# TODO: add description fields.
+
 ARCHIVE_TABLE_CONFIG_CONTRACT = {
     'type': 'object',
     'additionalProperties': False,
@@ -91,7 +91,7 @@ PROJECT_CONTRACT = {
         'target-path': {
             'type': 'string',
         },
-        'archive-paths': {
+        'snapshot-paths': {
             'type': 'array',
             'items': {'type': 'string'},
         },
@@ -188,6 +188,9 @@ GIT_PACKAGE_CONTRACT = {
             'items': {'type': 'string'},
             'description': 'The git revision to use, if it is not tip',
         },
+        'warn-unpinned': {
+            'type': 'boolean',
+        }
     },
     'required': ['git'],
 }
@@ -240,7 +243,7 @@ REGISTRY_PACKAGE_CONTRACT = {
             'description': 'The version of the package',
         },
     },
-    'required': ['package'],
+    'required': ['package', 'version'],
 }
 
 

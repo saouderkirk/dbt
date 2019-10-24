@@ -1,13 +1,18 @@
+import os
+
 from test.integration.base import DBTIntegrationTest, use_profile
 
 from dbt.exceptions import CompilationException
+from dbt.compat import open_file
+
+
 
 class TestSimpleSeed(DBTIntegrationTest):
 
     def setUp(self):
         DBTIntegrationTest.setUp(self)
 
-        self.run_sql_file("test/integration/005_simple_seed_test/seed.sql")
+        self.run_sql_file("seed.sql")
 
     @property
     def schema(self):
@@ -15,12 +20,12 @@ class TestSimpleSeed(DBTIntegrationTest):
 
     @property
     def models(self):
-        return "test/integration/005_simple_seed_test/models"
+        return "models"
 
     @property
     def project_config(self):
         return {
-            "data-paths": ['test/integration/005_simple_seed_test/data']
+            "data-paths": ['data']
         }
 
     @use_profile('postgres')
@@ -52,7 +57,7 @@ class TestSimpleSeedCustomSchema(DBTIntegrationTest):
 
     def setUp(self):
         DBTIntegrationTest.setUp(self)
-        self.run_sql_file("test/integration/005_simple_seed_test/seed.sql")
+        self.run_sql_file("seed.sql")
 
     @property
     def schema(self):
@@ -60,12 +65,12 @@ class TestSimpleSeedCustomSchema(DBTIntegrationTest):
 
     @property
     def models(self):
-        return "test/integration/005_simple_seed_test/models"
+        return "models"
 
     @property
     def project_config(self):
         return {
-            "data-paths": ['test/integration/005_simple_seed_test/data'],
+            "data-paths": ['data'],
             "seeds": {
                 "schema": "custom_schema"
             }
@@ -107,12 +112,12 @@ class TestSimpleSeedDisabled(DBTIntegrationTest):
 
     @property
     def models(self):
-        return "test/integration/005_simple_seed_test/models"
+        return "models"
 
     @property
     def project_config(self):
         return {
-            "data-paths": ['test/integration/005_simple_seed_test/data-config'],
+            "data-paths": ['data-config'],
             "seeds": {
                 "test": {
                     "seed_enabled": {
@@ -136,7 +141,7 @@ class TestSimpleSeedDisabled(DBTIntegrationTest):
 class TestSeedParsing(DBTIntegrationTest):
     def setUp(self):
         super(TestSeedParsing, self).setUp()
-        self.run_sql_file("test/integration/005_simple_seed_test/seed.sql")
+        self.run_sql_file("seed.sql")
 
     @property
     def schema(self):
@@ -144,12 +149,12 @@ class TestSeedParsing(DBTIntegrationTest):
 
     @property
     def models(self):
-        return "test/integration/005_simple_seed_test/models-exist"
+        return "models-exist"
 
     @property
     def project_config(self):
         return {
-            "data-paths": ['test/integration/005_simple_seed_test/data-bad']
+            "data-paths": ['data-bad']
         }
 
     @use_profile('postgres')
@@ -162,5 +167,55 @@ class TestSeedParsing(DBTIntegrationTest):
             self.run_dbt(['seed'])
 
 
+class TestSimpleSeedWithBOM(DBTIntegrationTest):
+
+    def setUp(self):
+        DBTIntegrationTest.setUp(self)
+        self.run_sql_file("seed.sql")
+
+    @property
+    def schema(self):
+        return "simple_seed_005"
+
+    @property
+    def models(self):
+        return "models"
+
+    @property
+    def project_config(self):
+        return {
+            "data-paths": ['data-bom']
+        }
+
+    @use_profile('postgres')
+    def test_simple_seed(self):
+        # first make sure nobody "fixed" the file by accident
+        seed_path = os.path.join(self.config.data_paths[0], 'seed_bom.csv')
+        # 'data-bom/seed_bom.csv'
+        with open_file(seed_path) as fp:
+            self.assertEqual(fp.read(1), u'\ufeff')
+        results = self.run_dbt(["seed"])
+        self.assertEqual(len(results),  1)
+        self.assertTablesEqual("seed_bom", "seed_expected")
 
 
+class TestSimpleSeedWithUnicode(DBTIntegrationTest):
+
+    @property
+    def schema(self):
+        return "simple_seed_005"
+
+    @property
+    def models(self):
+        return "models"
+
+    @property
+    def project_config(self):
+        return {
+            "data-paths": ['data-unicode']
+        }
+
+    @use_profile('postgres')
+    def test_simple_seed(self):
+        results = self.run_dbt(["seed"])
+        self.assertEqual(len(results),  1)

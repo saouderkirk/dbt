@@ -1,14 +1,15 @@
 import json
 import multiprocessing
 import os
+import random
 import socket
 import sys
 import time
-import unittest
 from base64 import standard_b64encode as b64
 from datetime import datetime, timedelta
 
 import requests
+from pytest import mark
 
 from dbt.exceptions import CompilationException
 from test.integration.base import DBTIntegrationTest, use_profile, AnyFloat, \
@@ -23,12 +24,12 @@ class BaseSourcesTest(DBTIntegrationTest):
 
     @property
     def models(self):
-        return "test/integration/042_sources_test/models"
+        return "models"
 
     @property
     def project_config(self):
         return {
-            'data-paths': ['test/integration/042_sources_test/data'],
+            'data-paths': ['data'],
             'quoting': {'database': True, 'schema': True, 'identifier': True},
         }
 
@@ -48,6 +49,41 @@ class BaseSourcesTest(DBTIntegrationTest):
 
 
 class TestSources(BaseSourcesTest):
+    @property
+    def project_config(self):
+        cfg = super(TestSources, self).project_config
+        cfg.update({
+            'macro-paths': ['macros'],
+        })
+        return cfg
+
+    def _create_schemas(self):
+        super(TestSources, self)._create_schemas()
+        self._create_schema_named(self.default_database,
+                                  self.alternative_schema())
+
+    def alternative_schema(self):
+        return self.unique_schema() + '_other'
+
+    def setUp(self):
+        super(TestSources, self).setUp()
+        self.run_sql(
+            'create table {}.dummy_table (id int)'.format(self.unique_schema())
+        )
+        self.run_sql(
+            'create view {}.external_view as (select * from {}.dummy_table)'
+            .format(self.alternative_schema(), self.unique_schema())
+        )
+
+    def run_dbt_with_vars(self, cmd, *args, **kwargs):
+        cmd.extend([
+            '--vars',
+            '{{test_run_schema: {}, test_run_alt_schema: {}}}'.format(
+                self.unique_schema(), self.alternative_schema()
+            )
+        ])
+        return self.run_dbt(cmd, *args, **kwargs)
+
     @use_profile('postgres')
     def test_postgres_basic_source_def(self):
         results = self.run_dbt_with_vars(['run'])
@@ -110,7 +146,7 @@ class TestSources(BaseSourcesTest):
         self.assertTableDoesNotExist('nonsource_descendant')
 
     @use_profile('postgres')
-    def test_source_childrens_parents(self):
+    def test_postgres_source_childrens_parents(self):
         results = self.run_dbt_with_vars([
             'run', '--models', '@source:test_source'
         ])
@@ -120,6 +156,13 @@ class TestSources(BaseSourcesTest):
             ['expected_multi_source', 'multi_source_model'],
         )
         self.assertTableDoesNotExist('nonsource_descendant')
+
+    @use_profile('postgres')
+    def test_postgres_run_operation_source(self):
+        kwargs = '{"source_name": "test_source", "table_name": "test_table"}'
+        self.run_dbt_with_vars([
+            'run-operation', 'vacuum_source', '--args', kwargs
+        ])
 
 
 class TestSourceFreshness(BaseSourcesTest):
@@ -170,6 +213,8 @@ class TestSourceFreshness(BaseSourcesTest):
         last_inserted_time = self.last_inserted_time
         if last_inserted_time is None:
             last_inserted_time = "2016-09-19T14:45:51+00:00"
+
+        self.assertEqual(len(data['sources']), 1)
 
         self.assertEqual(data['sources'], {
             'source.test.test_source.test_table': {
@@ -238,7 +283,7 @@ class TestSourceFreshness(BaseSourcesTest):
 class TestSourceFreshnessErrors(BaseSourcesTest):
     @property
     def models(self):
-        return "test/integration/042_sources_test/error_models"
+        return "error_models"
 
     @use_profile('postgres')
     def test_postgres_error(self):
@@ -255,7 +300,7 @@ class TestSourceFreshnessErrors(BaseSourcesTest):
 class TestMalformedSources(BaseSourcesTest):
     @property
     def models(self):
-        return "test/integration/042_sources_test/malformed_models"
+        return "malformed_models"
 
     @use_profile('postgres')
     def test_postgres_malformed_schema_nonstrict_will_not_break_run(self):
@@ -268,11 +313,12 @@ class TestMalformedSources(BaseSourcesTest):
 
 
 class ServerProcess(multiprocessing.Process):
-    def __init__(self, cli_vars=None):
-        self.port = 22991
+    def __init__(self, port, profiles_dir, cli_vars=None):
+        self.port = port
         handle_and_check_args = [
             '--strict', 'rpc', '--log-cache-events',
             '--port', str(self.port),
+            '--profiles-dir', profiles_dir
         ]
         if cli_vars:
             handle_and_check_args.extend(['--vars', cli_vars])
@@ -331,6 +377,7 @@ class BackgroundQueryProcess(multiprocessing.Process):
         else:
             return result
 
+
 _select_from_ephemeral = '''with __dbt__CTE__ephemeral_model as (
 
 
@@ -338,12 +385,24 @@ select 1 as id
 )select * from __dbt__CTE__ephemeral_model'''
 
 
-@unittest.skipIf(os.name == 'nt', 'Windows not supported for now')
+def addr_in_use(err, *args):
+    msg = str(err)
+    if 'Address already in use' in msg:
+        return True
+    if 'server never appeared!' in msg:
+        return True  # this can happen because of the above
+    return False
+
+
+@mark.flaky(rerun_filter=addr_in_use)
 class TestRPCServer(BaseSourcesTest):
     def setUp(self):
         super(TestRPCServer, self).setUp()
+        port = random.randint(20000, 65535)
         self._server = ServerProcess(
-            cli_vars='{{test_run_schema: {}}}'.format(self.unique_schema())
+            cli_vars='{{test_run_schema: {}}}'.format(self.unique_schema()),
+            profiles_dir=self.test_root_dir,
+            port=port
         )
         self._server.start()
 
@@ -354,9 +413,9 @@ class TestRPCServer(BaseSourcesTest):
     @property
     def project_config(self):
         return {
-            'data-paths': ['test/integration/042_sources_test/data'],
+            'data-paths': ['data'],
             'quoting': {'database': True, 'schema': True, 'identifier': True},
-            'macro-paths': ['test/integration/042_sources_test/macros'],
+            'macro-paths': ['macros'],
         }
 
     def build_query(self, method, kwargs, sql=None, test_request_id=1,
@@ -683,6 +742,8 @@ class TestRPCServer(BaseSourcesTest):
             table={'column_names': ['id'], 'rows': [[1.0]]}
         )
 
+    @mark.skipif(os.name == 'nt', reason='"kill" not supported on windows')
+    @mark.flaky(rerun_filter=None)
     @use_profile('postgres')
     def test_ps_kill_postgres(self):
         done_query = self.query('compile', 'select 1 as id', name='done').json()
@@ -768,6 +829,8 @@ class TestRPCServer(BaseSourcesTest):
 
         self.assertTrue(False, 'request ID never found running!')
 
+    @mark.skipif(os.name == 'nt', reason='"kill" not supported on windows')
+    @mark.flaky(rerun_filter=lambda *a, **kw: True)
     @use_profile('postgres')
     def test_ps_kill_longwait_postgres(self):
         pg_sleeper, sleep_task_id, request_id = self._get_sleep_query()
@@ -855,4 +918,6 @@ class TestRPCServer(BaseSourcesTest):
         self.assertIn('message', error_data)
         self.assertEqual(error_data['message'], 'RPC timed out after 1s')
         self.assertIn('logs', error_data)
-        self.assertTrue(len(error_data['logs']) > 0)
+        # on windows, process start is so slow that frequently we won't have collected any logs
+        if os.name != 'nt':
+            self.assertTrue(len(error_data['logs']) > 0)

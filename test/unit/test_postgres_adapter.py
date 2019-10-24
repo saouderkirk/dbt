@@ -58,15 +58,15 @@ class TestPostgresAdapter(unittest.TestCase):
         except BaseException as e:
             self.fail('acquiring connection failed with unknown exception: {}'
                       .format(str(e)))
-        self.assertEquals(connection.type, 'postgres')
+        self.assertEqual(connection.type, 'postgres')
         psycopg2.connect.assert_called_once()
 
     @mock.patch('dbt.adapters.postgres.connections.psycopg2')
     def test_acquire_connection(self, psycopg2):
         connection = self.adapter.acquire_connection('dummy')
 
-        self.assertEquals(connection.state, 'open')
-        self.assertNotEquals(connection.handle, None)
+        self.assertEqual(connection.state, 'open')
+        self.assertNotEqual(connection.handle, None)
         psycopg2.connect.assert_called_once()
 
     def test_cancel_open_connections_empty(self):
@@ -124,6 +124,38 @@ class TestPostgresAdapter(unittest.TestCase):
             port=5432,
             connect_timeout=10,
             keepalives_idle=256)
+
+    @mock.patch('dbt.adapters.postgres.connections.psycopg2')
+    def test_search_path(self, psycopg2):
+        self.config.credentials = self.config.credentials.incorporate(
+            search_path="test"
+        )
+        connection = self.adapter.acquire_connection('dummy')
+
+        psycopg2.connect.assert_called_once_with(
+            dbname='postgres',
+            user='root',
+            host='thishostshouldnotexist',
+            password='password',
+            port=5432,
+            connect_timeout=10,
+            options="-c search_path=test")
+
+    @mock.patch('dbt.adapters.postgres.connections.psycopg2')
+    def test_schema_with_space(self, psycopg2):
+        self.config.credentials = self.config.credentials.incorporate(
+            search_path="test test"
+        )
+        connection = self.adapter.acquire_connection('dummy')
+
+        psycopg2.connect.assert_called_once_with(
+            dbname='postgres',
+            user='root',
+            host='thishostshouldnotexist',
+            password='password',
+            port=5432,
+            connect_timeout=10,
+            options="-c search_path=test\ test")
 
     @mock.patch('dbt.adapters.postgres.connections.psycopg2')
     def test_set_zero_keepalive(self, psycopg2):

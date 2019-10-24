@@ -318,12 +318,9 @@ def ref_invalid_args(model, args):
         model)
 
 
-def ref_bad_context(model, target_model_name, target_model_package):
-    ref_string = "{{ ref('" + target_model_name + "') }}"
-
-    if target_model_package is not None:
-        ref_string = ("{{ ref('" + target_model_package +
-                      "', '" + target_model_name + "') }}")
+def ref_bad_context(model, args):
+    ref_args = ', '.join("'{}'".format(a) for a in args)
+    ref_string = '{{{{ ref({}) }}}}'.format(ref_args)
 
     base_error_msg = """dbt was unable to infer all dependencies for the model "{model_name}".
 This typically happens when ref() is placed within a conditional block.
@@ -653,7 +650,9 @@ def raise_unrecognized_credentials_type(typename, supported_types):
 
 
 def raise_not_implemented(msg):
-    raise NotImplementedException(msg)
+    raise NotImplementedException(
+        "ERROR: {}"
+        .format(msg))
 
 def raise_fail_on_schema_change():
     MESSAGE="Schema change detected and configuration of on_schema_change set to 'fail'"
@@ -664,6 +663,16 @@ def warn_or_error(msg, node=None, log_fmt=None):
     if dbt.flags.WARN_ERROR:
         raise_compiler_error(msg, node)
     else:
+        if log_fmt is not None:
+            msg = log_fmt.format(msg)
+        logger.warning(msg)
+
+
+def warn_or_raise(exc, log_fmt=None):
+    if dbt.flags.WARN_ERROR:
+        raise exc
+    else:
+        msg = str(exc)
         if log_fmt is not None:
             msg = log_fmt.format(msg)
         logger.warning(msg)
@@ -688,6 +697,7 @@ CONTEXT_EXPORTS = {
         raise_duplicate_patch_name,
         raise_duplicate_resource_name,
         raise_invalid_schema_yml_version,
+        raise_not_implemented,
         relation_wrong_type,
         raise_fail_on_schema_change,
     ]

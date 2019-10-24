@@ -17,11 +17,13 @@ import dbt.task.deps as deps_task
 import dbt.task.init as init_task
 import dbt.task.seed as seed_task
 import dbt.task.test as test_task
-import dbt.task.archive as archive_task
+import dbt.task.snapshot as snapshot_task
 import dbt.task.generate as generate_task
 import dbt.task.serve as serve_task
 import dbt.task.freshness as freshness_task
 import dbt.task.run_operation as run_operation_task
+from dbt.task.list import ListTask
+from dbt.task.migrate import MigrationTask
 from dbt.task.rpc_server import RPCServerTask
 from dbt.adapters.factory import reset_adapters
 
@@ -92,8 +94,8 @@ def main(args=None):
         exit_code = e.code
 
     except BaseException as e:
-        logger.info("Encountered an error:")
-        logger.info(str(e))
+        logger.warn("Encountered an error:")
+        logger.warn(str(e))
 
         if logger_initialized():
             logger.debug(traceback.format_exc())
@@ -103,6 +105,8 @@ def main(args=None):
             # trace at error level.
             logger.error(traceback.format_exc())
         exit_code = ExitCodes.UnhandledError
+
+    _python2_compatibility_message()
 
     sys.exit(exit_code)
 
@@ -125,13 +129,7 @@ def initialize_config_values(parsed):
     except RuntimeException:
         cfg = UserConfig.from_dict(None)
 
-    if cfg.send_anonymous_usage_stats:
-        dbt.tracking.initialize_tracking(parsed.profiles_dir)
-    else:
-        dbt.tracking.do_not_track()
-
-    if cfg.use_colors:
-        dbt.ui.printer.use_colors()
+    cfg.set_values(parsed.profiles_dir)
 
 
 def handle_and_check(args):
@@ -179,10 +177,27 @@ def track_run(task):
         dbt.tracking.flush()
 
 
+_PYTHON_27_WARNING = '''
+Python 2.7 will reach the end of its life on January 1st, 2020.
+Please upgrade your Python as Python 2.7 won't be maintained after that date.
+A future version of dbt will drop support for Python 2.7.
+'''.strip()
+
+
+def _python2_compatibility_message():
+    if dbt.compat.WHICH_PYTHON != 2:
+        return
+
+    logger.critical(
+        dbt.ui.printer.red('DEPRECATION: ') + _PYTHON_27_WARNING
+    )
+
+
 def run_from_args(parsed):
     log_cache_events(getattr(parsed, 'log_cache_events', False))
-    update_flags(parsed)
+    flags.set_from_args(parsed)
 
+    parsed.cls.pre_init_hook()
     logger.info("Running with dbt{}".format(dbt.version.installed))
 
     # this will convert DbtConfigErrors into RuntimeExceptions
@@ -203,28 +218,18 @@ def run_from_args(parsed):
     return task, results
 
 
-def update_flags(parsed):
-    flags.USE_CACHE = getattr(parsed, 'use_cache', True)
-
-    arg_drop_existing = getattr(parsed, 'drop_existing', False)
-    arg_full_refresh = getattr(parsed, 'full_refresh', False)
-    flags.STRICT_MODE = getattr(parsed, 'strict', False)
-    flags.WARN_ERROR = (
-        flags.STRICT_MODE or
-        getattr(parsed, 'warn_error', False)
-    )
-
-    if arg_drop_existing:
-        dbt.deprecations.warn('drop-existing')
-        flags.FULL_REFRESH = True
-    elif arg_full_refresh:
-        flags.FULL_REFRESH = True
-
-    flags.TEST_NEW_PARSER = getattr(parsed, 'test_new_parser', False)
-
-
 def _build_base_subparser():
     base_subparser = argparse.ArgumentParser(add_help=False)
+
+    base_subparser.add_argument(
+        '--project-dir',
+        default=None,
+        type=str,
+        help="""
+        Which directory to look in for the dbt_project.yml file.
+        Default is the current working directory and its parents.
+        """
+    )
 
     base_subparser.add_argument(
         '--profiles-dir',
@@ -342,22 +347,29 @@ def _build_deps_subparser(subparsers, base_subparser):
     return sub
 
 
-def _build_archive_subparser(subparsers, base_subparser):
+def _build_snapshot_subparser(subparsers, base_subparser, which='snapshot'):
+    if which == 'archive':
+        helpmsg = (
+            'DEPRECATED: This command is deprecated and will\n'
+            'be removed in a future release. Use dbt snapshot instead.'
+        )
+    else:
+        helpmsg = 'Execute snapshots defined in your project'
+
     sub = subparsers.add_parser(
-        'archive',
+        which,
         parents=[base_subparser],
-        help="Record changes to a mutable table over time."
-             "\nMust be configured in your dbt_project.yml.")
+        help=helpmsg)
     sub.add_argument(
         '--threads',
         type=int,
         required=False,
         help="""
-        Specify number of threads to use while archiving tables. Overrides
+        Specify number of threads to use while snapshotting tables. Overrides
         settings in profiles.yml.
         """
     )
-    sub.set_defaults(cls=archive_task.ArchiveTask, which='archive')
+    sub.set_defaults(cls=snapshot_task.SnapshotTask, which=which)
     return sub
 
 
@@ -397,11 +409,13 @@ def _build_docs_generate_subparser(subparsers, base_subparser):
     return generate_sub
 
 
-def _add_selection_arguments(*subparsers):
+def _add_selection_arguments(*subparsers, **kwargs):
+    models_name = kwargs.get('models_name', 'models')
     for sub in subparsers:
         sub.add_argument(
-            '-m',
-            '--models',
+            '-{}'.format(models_name[0]),
+            '--{}'.format(models_name),
+            dest='models',
             required=False,
             nargs='+',
             help="""
@@ -455,11 +469,6 @@ def _build_seed_subparser(subparsers, base_subparser):
         'seed',
         parents=[base_subparser],
         help="Load data from csv files into your data warehouse.")
-    seed_sub.add_argument(
-        '--drop-existing',
-        action='store_true',
-        help='(DEPRECATED) Use --full-refresh instead.'
-    )
     seed_sub.add_argument(
         '--full-refresh',
         action='store_true',
@@ -569,9 +578,117 @@ def _build_rpc_subparser(subparsers, base_subparser):
     return sub
 
 
+def _build_list_subparser(subparsers, base_subparser):
+    sub = subparsers.add_parser(
+        'list',
+        parents=[base_subparser],
+        help='List the resources in your project'
+    )
+    sub.set_defaults(cls=ListTask, which='list')
+    resource_values = list(ListTask.ALL_RESOURCE_VALUES) + ['default', 'all']
+    sub.add_argument('--resource-type',
+                     choices=resource_values,
+                     action='append',
+                     default=[],
+                     dest='resource_types')
+    sub.add_argument('--output',
+                     choices=['json', 'name', 'path', 'selector'],
+                     default='selector')
+    sub.add_argument(
+        '-s',
+        '--select',
+        required=False,
+        nargs='+',
+        metavar='SELECTOR',
+        help="Specify the nodes to select.",
+    )
+    sub.add_argument(
+        '-m',
+        '--models',
+        required=False,
+        nargs='+',
+        metavar='SELECTOR',
+        help="Specify the models to select and set the resource-type to "
+              "'model'. Mutually exclusive with '--select' (or '-s') and "
+              "'--resource-type'",
+    )
+    sub.add_argument(
+        '--exclude',
+        required=False,
+        nargs='+',
+        metavar='SELECTOR',
+        help="Specify the models to exclude."
+    )
+    # in python 3.x you can use the 'aliases' kwarg, but in python 2.7 you get
+    # to do this
+    subparsers._name_parser_map['ls'] = sub
+    return sub
+
+
+def _build_run_operation_subparser(subparsers, base_subparser):
+    sub = subparsers.add_parser(
+        'run-operation',
+        parents=[base_subparser],
+        help="""
+            (beta) Run the named macro with any supplied arguments. This
+            subcommand is unstable and subject to change in a future release
+            of dbt. Please use it with caution"""
+    )
+    sub.add_argument(
+        'macro',
+        help="""
+            Specify the macro to invoke. dbt will call this macro with the
+            supplied arguments and then exit"""
+    )
+    sub.add_argument(
+        '--args',
+        type=str,
+        default='{}',
+        help="""
+            Supply arguments to the macro. This dictionary will be mapped
+            to the keyword arguments defined in the selected macro. This
+            argument should be a YAML string, eg. '{my_variable: my_value}'"""
+    )
+    sub.set_defaults(cls=run_operation_task.RunOperationTask,
+                     which='run-operation')
+    return sub
+
+
+def _build_snapshot_migrate_subparser(subparsers, base_subparser):
+    sub = subparsers.add_parser(
+        'snapshot-migrate',
+        parents=[base_subparser],
+        help='Run the snapshot migration script'
+    )
+    sub.add_argument(
+        '--from-archive',
+        action='store_true',
+        help=('This flag is required for the 0.14.0 archive to snapshot '
+              'migration')
+    )
+    sub.add_argument(
+        '--apply-files',
+        action='store_true',
+        dest='write_files',
+        help='If set, write .sql files to disk instead of logging them'
+    )
+    sub.add_argument(
+        '--apply-database',
+        action='store_true',
+        dest='migrate_database',
+        help='If set, perform just the database migration'
+    )
+    sub.add_argument(
+        '--apply',
+        action='store_true',
+        help='If set, implies --apply-database --apply-files'
+    )
+    sub.set_defaults(cls=MigrationTask, which='migration')
+
+
 def parse_args(args):
     p = DBTArgumentParser(
-        prog='dbt: data build tool',
+        prog='dbt',
         formatter_class=argparse.RawTextHelpFormatter,
         description="An ELT tool for managing your SQL "
         "transformations and data models."
@@ -645,16 +762,19 @@ def parse_args(args):
 
     # make the subcommands that have their own subcommands
     docs_sub = _build_docs_subparser(subs, base_subparser)
-    docs_subs = docs_sub.add_subparsers()
+    docs_subs = docs_sub.add_subparsers(title="Available sub-commands")
     source_sub = _build_source_subparser(subs, base_subparser)
-    source_subs = source_sub.add_subparsers()
+    source_subs = source_sub.add_subparsers(title="Available sub-commands")
 
     _build_init_subparser(subs, base_subparser)
     _build_clean_subparser(subs, base_subparser)
     _build_debug_subparser(subs, base_subparser)
     _build_deps_subparser(subs, base_subparser)
+    _build_list_subparser(subs, base_subparser)
+    _build_snapshot_migrate_subparser(subs, base_subparser)
 
-    archive_sub = _build_archive_subparser(subs, base_subparser)
+    snapshot_sub = _build_snapshot_subparser(subs, base_subparser)
+    archive_sub = _build_snapshot_subparser(subs, base_subparser, 'archive')
     rpc_sub = _build_rpc_subparser(subs, base_subparser)
     run_sub = _build_run_subparser(subs, base_subparser)
     compile_sub = _build_compile_subparser(subs, base_subparser)
@@ -666,39 +786,14 @@ def parse_args(args):
     # --models, --exclude
     _add_selection_arguments(run_sub, compile_sub, generate_sub, test_sub,
                              archive_sub)
+    _add_selection_arguments(snapshot_sub, models_name='select')
     # --full-refresh
     _add_table_mutability_arguments(run_sub, compile_sub)
 
     _build_seed_subparser(subs, base_subparser)
     _build_docs_serve_subparser(docs_subs, base_subparser)
     _build_source_snapshot_freshness_subparser(source_subs, base_subparser)
-
-    sub = subs.add_parser(
-        'run-operation',
-        parents=[base_subparser],
-        help="""
-            (beta) Run the named macro with any supplied arguments. This
-            subcommand is unstable and subject to change in a future release
-            of dbt. Please use it with caution"""
-    )
-    sub.add_argument(
-        '--macro',
-        required=True,
-        help="""
-            Specify the macro to invoke. dbt will call this macro with the
-            supplied arguments and then exit"""
-    )
-    sub.add_argument(
-        '--args',
-        type=str,
-        default='{}',
-        help="""
-            Supply arguments to the macro. This dictionary will be mapped
-            to the keyword arguments defined in the selected macro. This
-            argument should be a YAML string, eg. '{my_variable: my_value}'"""
-    )
-    sub.set_defaults(cls=run_operation_task.RunOperationTask,
-                     which='run-operation')
+    _build_run_operation_subparser(subs, base_subparser)
 
     if len(args) == 0:
         p.print_help()

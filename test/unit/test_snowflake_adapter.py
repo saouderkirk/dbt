@@ -14,6 +14,7 @@ from snowflake import connector as snowflake_connector
 from .utils import config_from_parts_or_dicts, inject_adapter, mock_connection
 
 
+
 class TestSnowflakeAdapter(unittest.TestCase):
     def setUp(self):
         flags.STRICT_MODE = False
@@ -164,7 +165,7 @@ class TestSnowflakeAdapter(unittest.TestCase):
                 account='test_account', autocommit=False,
                 client_session_keep_alive=False, database='test_database',
                 role=None, schema='public', user='test_user',
-                warehouse='test_warehouse', private_key=None)
+                warehouse='test_warehouse', private_key=None, application='dbt')
         ])
 
     def test_client_session_keep_alive_true(self):
@@ -178,7 +179,7 @@ class TestSnowflakeAdapter(unittest.TestCase):
                 account='test_account', autocommit=False,
                 client_session_keep_alive=True, database='test_database',
                 role=None, schema='public', user='test_user',
-                warehouse='test_warehouse', private_key=None)
+                warehouse='test_warehouse', private_key=None, application='dbt')
         ])
 
     def test_user_pass_authentication(self):
@@ -192,7 +193,8 @@ class TestSnowflakeAdapter(unittest.TestCase):
                 account='test_account', autocommit=False,
                 client_session_keep_alive=False, database='test_database',
                 password='test_password', role=None, schema='public',
-                user='test_user', warehouse='test_warehouse', private_key=None)
+                user='test_user', warehouse='test_warehouse', private_key=None,
+                application='dbt')
         ])
 
     def test_authenticator_user_pass_authentication(self):
@@ -207,7 +209,8 @@ class TestSnowflakeAdapter(unittest.TestCase):
                 client_session_keep_alive=False, database='test_database',
                 password='test_password', role=None, schema='public',
                 user='test_user', warehouse='test_warehouse',
-                authenticator='test_sso_url', private_key=None)
+                authenticator='test_sso_url', private_key=None,
+                application='dbt')
         ])
 
     def test_authenticator_externalbrowser_authentication(self):
@@ -222,7 +225,7 @@ class TestSnowflakeAdapter(unittest.TestCase):
                 client_session_keep_alive=False, database='test_database',
                 role=None, schema='public', user='test_user',
                 warehouse='test_warehouse', authenticator='externalbrowser',
-                private_key=None)
+                private_key=None, application='dbt')
         ])
 
     @patch('dbt.adapters.snowflake.SnowflakeConnectionManager._get_private_key', return_value='test_key')
@@ -239,5 +242,35 @@ class TestSnowflakeAdapter(unittest.TestCase):
                 account='test_account', autocommit=False,
                 client_session_keep_alive=False, database='test_database',
                 role=None, schema='public', user='test_user',
-                warehouse='test_warehouse', private_key='test_key')
+                warehouse='test_warehouse', private_key='test_key',
+                application='dbt')
+        ])
+
+    def test_authenticator_user_pass_authentication(self):
+        self.config.credentials = self.config.credentials.incorporate(
+            password='test_password', authenticator='test_sso_url')
+        self.adapter = SnowflakeAdapter(self.config)
+        self.adapter.get_connection(name='new_connection_with_new_config')
+
+        self.snowflake.assert_has_calls([
+            mock.call(
+                account='test_account', autocommit=False,
+                client_session_keep_alive=False, database='test_databse',
+                password='test_password', role=None, schema='public',
+                user='test_user', warehouse='test_warehouse',
+                authenticator='test_sso_url')
+        ])
+
+    def test_authenticator_externalbrowser_authentication(self):
+        self.config.credentials = self.config.credentials.incorporate(
+            authenticator='externalbrowser')
+        self.adapter = SnowflakeAdapter(self.config)
+        self.adapter.get_connection(name='new_connection_with_new_config')
+
+        self.snowflake.assert_has_calls([
+            mock.call(
+                account='test_account', autocommit=False,
+                client_session_keep_alive=False, database='test_databse',
+                role=None, schema='public', user='test_user',
+                warehouse='test_warehouse', authenticator='externalbrowser')
         ])

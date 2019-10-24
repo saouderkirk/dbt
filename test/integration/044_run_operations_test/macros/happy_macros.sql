@@ -17,8 +17,28 @@
   {% endif %}
 {% endmacro %}
 
+{% macro select_something(name) %}
+  {% set query %}
+    select 'hello, {{ name }}' as name
+  {% endset %}
+  {% set table = run_query(query) %}
+
+  {% if table.columns['name'][0] != 'hello, world' %}
+    {% do exceptions.raise_compiler_error("unexpected result: " ~ table) %}
+  {% endif %}
+{% endmacro %}
+
 {% macro vacuum(table_name) %}
-  {% call statement(auto_begin=false) %}
+  {% set query %}
     vacuum "{{ schema }}"."{{ table_name }}"
-  {% endcall %}
+  {% endset %}
+  {% do run_query(query) %}
+{% endmacro %}
+
+
+{% macro vacuum_ref(ref_target) %}
+  {% set query %}
+    vacuum {{ ref(ref_target) }}
+  {% endset %}
+  {% do run_query(query) %}
 {% endmacro %}

@@ -25,21 +25,21 @@ graph_file_name = 'graph.gpickle'
 
 def print_compile_stats(stats):
     names = {
-        NodeType.Model: 'models',
-        NodeType.Test: 'tests',
-        NodeType.Archive: 'archives',
-        NodeType.Analysis: 'analyses',
-        NodeType.Macro: 'macros',
-        NodeType.Operation: 'operations',
-        NodeType.Seed: 'seed files',
-        NodeType.Source: 'sources',
+        NodeType.Model: 'model',
+        NodeType.Test: 'test',
+        NodeType.Snapshot: 'snapshot',
+        NodeType.Analysis: 'analyse',
+        NodeType.Macro: 'macro',
+        NodeType.Operation: 'operation',
+        NodeType.Seed: 'seed file',
+        NodeType.Source: 'source',
     }
 
     results = {k: 0 for k in names.keys()}
     results.update(stats)
 
     stat_line = ", ".join(
-        ["{} {}".format(ct, names.get(t)) for t, ct in results.items()])
+        [dbt.utils.pluralize(ct, names.get(t)) for t, ct in results.items()])
 
     logger.notice("Found {}".format(stat_line))
 
@@ -134,15 +134,16 @@ class Compiler(object):
             if 'data' in injected_node.tags and \
                is_type(injected_node, NodeType.Test):
                 injected_node.wrapped_sql = (
-                    "select count(*) from (\n{test_sql}\n) sbq").format(
+                    "select count(*) as errors "
+                    "from (\n{test_sql}\n) sbq").format(
                         test_sql=injected_node.injected_sql)
             else:
                 # don't wrap schema tests or analyses.
                 injected_node.wrapped_sql = injected_node.injected_sql
 
-        elif is_type(injected_node, NodeType.Archive):
+        elif is_type(injected_node, NodeType.Snapshot):
             # unfortunately we do everything automagically for
-            # archives. in the future it'd be nice to generate
+            # snapshots. in the future it'd be nice to generate
             # the SQL at the parser level.
             pass
 
@@ -209,7 +210,7 @@ def _is_writable(node):
     if not node.injected_sql:
         return False
 
-    if dbt.utils.is_type(node, NodeType.Archive):
+    if dbt.utils.is_type(node, NodeType.Snapshot):
         return False
 
     return True

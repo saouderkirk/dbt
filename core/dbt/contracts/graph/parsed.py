@@ -47,6 +47,10 @@ CONFIG_CONTRACT = {
         'materialized': {
             'type': 'string',
         },
+        'persist_docs': {
+            'type': 'object',
+            'additionalProperties': True,
+        },
         'post-hook': {
             'type': 'array',
             'items': HOOK_CONTRACT,
@@ -82,11 +86,15 @@ CONFIG_CONTRACT = {
         },
         'on_schema_change': {
             'type': 'string'
-        }
+        },
+        'severity': {
+            'type': 'string',
+            'pattern': '([eE][rR][rR][oO][rR]|[wW][aA][rR][nN])',
+        },
     },
     'required': [
         'enabled', 'materialized', 'post-hook', 'pre-hook', 'vars',
-        'quoting', 'column_types', 'tags'
+        'quoting', 'column_types', 'tags', 'persist_docs'
     ]
 }
 
@@ -444,7 +452,7 @@ class ParsedNode(APIObject):
         self._contents['config'] = value
 
 
-ARCHIVE_CONFIG_CONTRACT = {
+SNAPSHOT_CONFIG_CONTRACT = {
     'properties': {
         'target_database': {
             'type': 'string',
@@ -495,26 +503,26 @@ ARCHIVE_CONFIG_CONTRACT = {
         ]
     },
     'required': [
-        'target_database', 'target_schema', 'unique_key', 'strategy',
+        'target_schema', 'unique_key', 'strategy',
     ],
 }
 
 
-PARSED_ARCHIVE_NODE_CONTRACT = deep_merge(
+PARSED_SNAPSHOT_NODE_CONTRACT = deep_merge(
     PARSED_NODE_CONTRACT,
     {
         'properties': {
-            'config': ARCHIVE_CONFIG_CONTRACT,
+            'config': SNAPSHOT_CONFIG_CONTRACT,
             'resource_type': {
-                'enum': [NodeType.Archive],
+                'enum': [NodeType.Snapshot],
             },
         },
     }
 )
 
 
-class ParsedArchiveNode(ParsedNode):
-    SCHEMA = PARSED_ARCHIVE_NODE_CONTRACT
+class ParsedSnapshotNode(ParsedNode):
+    SCHEMA = PARSED_SNAPSHOT_NODE_CONTRACT
 
 
 # The parsed node update is only the 'patch', not the test. The test became a
@@ -733,6 +741,7 @@ PARSED_SOURCE_DEFINITION_CONTRACT = deep_merge(
     HAS_UNIQUE_ID_CONTRACT,
     HAS_DOCREFS_CONTRACT,
     HAS_RELATION_METADATA_CONTRACT,
+    HAS_FQN_CONTRACT,
     {
         'description': (
             'A source table definition, as parsed from the one provided in the'

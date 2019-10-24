@@ -9,18 +9,16 @@ class TestOperations(DBTIntegrationTest):
 
     @property
     def models(self):
-        return "test/integration/044_run_operations_test/models"
+        return "models"
 
     @property
     def project_config(self):
         return {
-            "macro-paths": ['test/integration/044_run_operations_test/macros'],
+            "macro-paths": ['macros'],
         }
 
     def run_operation(self, macro, expect_pass=True, extra_args=None, **kwargs):
-        args = ['run-operation']
-        if macro:
-            args.extend(('--macro', macro))
+        args = ['run-operation', macro]
         if kwargs:
             args.extend(('--args', yaml.safe_dump(kwargs)))
         if extra_args:
@@ -56,3 +54,13 @@ class TestOperations(DBTIntegrationTest):
         self.run_dbt(['run'])
         # this should succeed
         self.run_operation('vacuum', table_name='model')
+
+    @use_profile('postgres')
+    def test__postgres_vacuum_ref(self):
+        self.run_dbt(['run'])
+        # this should succeed
+        self.run_operation('vacuum_ref', ref_target='model')
+
+    @use_profile('postgres')
+    def test__postgres_select(self):
+        self.run_operation('select_something', name='world')

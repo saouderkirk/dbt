@@ -26,6 +26,16 @@ import time
 import agate
 
 
+def _stub_relation(*args, **kwargs):
+    return BigQueryRelation.create(
+        database='',
+        schema='',
+        identifier='',
+        quote_policy={},
+        type=BigQueryRelation.Table
+    )
+
+
 class BigQueryAdapter(BaseAdapter):
 
     RELATION_TYPES = {
@@ -81,8 +91,9 @@ class BigQueryAdapter(BaseAdapter):
         client = conn.handle
 
         with self.connections.exception_handler('list dataset'):
+            # this is similar to how we have to deal with listing tables
             all_datasets = client.list_datasets(project=database,
-                                                include_all=True)
+                                                max_results=10000)
             return [ds.dataset_id for ds in all_datasets]
 
     @available
@@ -104,6 +115,10 @@ class BigQueryAdapter(BaseAdapter):
             return []
 
     def expand_column_types(self, goal, current):
+        # This is a no-op on BigQuery
+        pass
+
+    def expand_target_column_types(self, from_relation, to_relation):
         # This is a no-op on BigQuery
         pass
 
@@ -303,7 +318,7 @@ class BigQueryAdapter(BaseAdapter):
     ###
     # Special bigquery adapter methods
     ###
-    @available
+    @available.parse_none
     def make_date_partitioned_table(self, relation):
         return self.connections.create_date_partitioned_table(
             database=relation.database,
@@ -311,7 +326,7 @@ class BigQueryAdapter(BaseAdapter):
             table_name=relation.identifier
         )
 
-    @available
+    @available.parse(lambda *a, **k: '')
     def execute_model(self, model, materialization, sql_override=None,
                       decorator=None):
 
@@ -333,24 +348,7 @@ class BigQueryAdapter(BaseAdapter):
 
         return res
 
-    @available
-    def create_temporary_table(self, sql, **kwargs):
-
-        # BQ queries always return a temp table with their results
-        query_job, _ = self.connections.raw_execute(sql)
-        bq_table = query_job.destination
-
-        return self.Relation.create(
-            database=bq_table.project,
-            schema=bq_table.dataset_id,
-            identifier=bq_table.table_id,
-            quote_policy={
-                'schema': True,
-                'identifier': True
-            },
-            type=BigQueryRelation.Table)
-
-    @available
+    @available.parse_none
     def alter_table_add_columns(self, relation, columns):
 
         logger.debug('Adding columns ({}) to table {}".'.format(
@@ -370,7 +368,7 @@ class BigQueryAdapter(BaseAdapter):
         new_table = google.cloud.bigquery.Table(table_ref, schema=new_schema)
         client.update_table(new_table, ['schema'])
 
-    @available
+    @available.parse_none
     def load_dataframe(self, database, schema, table_name, agate_table,
                        column_override):
         bq_schema = self._agate_to_schema(agate_table, column_override)

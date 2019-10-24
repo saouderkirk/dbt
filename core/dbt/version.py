@@ -56,5 +56,6 @@ def get_version_information():
                 .format(version_msg))
 
 
-__version__ = '0.13.20190426'
+
+__version__ = '0.14.20190426'
 installed = get_installed_version()

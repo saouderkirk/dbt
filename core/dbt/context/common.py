@@ -45,7 +45,7 @@ class RelationProxy(object):
         return self.relation_type.create(*args, **kwargs)
 
 
-class DatabaseWrapper(object):
+class BaseDatabaseWrapper(object):
     """
     Wrapper for runtime database interaction. Applies the runtime quote policy
     via a relation proxy.
@@ -55,14 +55,7 @@ class DatabaseWrapper(object):
         self.Relation = RelationProxy(adapter)
 
     def __getattr__(self, name):
-        if name in self.adapter._available_:
-            return getattr(self.adapter, name)
-        else:
-            raise AttributeError(
-                "'{}' object has no attribute '{}'".format(
-                    self.__class__.__name__, name
-                )
-            )
+        raise NotImplementedError('subclasses need to implement this')
 
     @property
     def config(self):
@@ -73,6 +66,22 @@ class DatabaseWrapper(object):
 
     def commit(self):
         return self.adapter.commit_if_has_connection()
+
+
+class BaseResolver(object):
+    def __init__(self, db_wrapper, model, config, manifest):
+        self.db_wrapper = db_wrapper
+        self.model = model
+        self.config = config
+        self.manifest = manifest
+
+    @property
+    def current_project(self):
+        return self.config.project_name
+
+    @property
+    def Relation(self):
+        return self.db_wrapper.Relation
 
 
 def _add_macro_map(context, package_name, macro_map):
@@ -184,6 +193,13 @@ def _load_result(sql_results):
         return sql_results.get(name)
 
     return call
+
+
+def _debug_here():
+    import sys
+    import ipdb
+    frame = sys._getframe(3)
+    ipdb.set_trace(frame)
 
 
 def _add_sql_handlers(context):
@@ -336,6 +352,22 @@ def get_datetime_module_context():
     }
 
 
+def get_context_modules():
+    return {
+        'pytz': get_pytz_module_context(),
+        'datetime': get_datetime_module_context(),
+    }
+
+
+def generate_config_context(cli_vars):
+    context = {
+        'env_var': env_var,
+        'modules': get_context_modules(),
+    }
+    context['var'] = Var(None, context, cli_vars)
+    return _add_tracking(context)
+
+
 def generate_base(model, model_dict, config, manifest, source_config,
                   provider, adapter=None):
     """Generate the common aspects of the config dict."""
@@ -358,7 +390,7 @@ def generate_base(model, model_dict, config, manifest, source_config,
     pre_hooks = None
     post_hooks = None
 
-    db_wrapper = DatabaseWrapper(adapter)
+    db_wrapper = provider.DatabaseWrapper(adapter)
 
     context = dbt.utils.merge(context, {
         "adapter": db_wrapper,
@@ -373,14 +405,10 @@ def generate_base(model, model_dict, config, manifest, source_config,
         "exceptions": dbt.exceptions.wrapped_exports(model),
         "execute": provider.execute,
         "flags": dbt.flags,
-        # TODO: Do we have to leave this in?
         "graph": manifest.to_flat_graph(),
         "log": log,
         "model": model_dict,
-        "modules": {
-            "pytz": get_pytz_module_context(),
-            "datetime": get_datetime_module_context(),
-        },
+        "modules": get_context_modules(),
         "post_hooks": post_hooks,
         "pre_hooks": pre_hooks,
         "ref": provider.ref(db_wrapper, model, config, manifest),
@@ -394,6 +422,8 @@ def generate_base(model, model_dict, config, manifest, source_config,
         "target": target,
         "try_or_compiler_error": try_or_compiler_error(model)
     })
+    if os.environ.get('DBT_MACRO_DEBUGGING'):
+        context['debug'] = _debug_here
 
     return context
 

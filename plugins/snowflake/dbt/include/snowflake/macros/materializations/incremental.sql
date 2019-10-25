@@ -7,21 +7,15 @@
   {%- set identifier = model['alias'] -%}
 
 
-  -- Ideally, you should be able to override this macro to define what you want to consider a schema change. The default is to
--- look at the following between the new relation and the old relation:
---    1. Addition of new column
---    2. Deletion of column
---    3. Rename of column
---    4. Changing of column data type
-{% macro dbt__snowflake_has_schema_changed(on_schema_change, old_relation, target_relation) -%}
+  {% macro dbt__snowflake_has_schema_changed(on_schema_change, old_relation, target_relation) %}
 
-{% if on_schema_change == 'fail' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) and not full_refresh_mode -%}
-  {{ exceptions.raise_fail_on_schema_change() }}
-{% elif on_schema_change == 'full_refresh' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) -%}
-  {%- set full_refresh_mode = True -%}
-{%- endif %}
+    {% if on_schema_change == 'fail' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) and not full_refresh_mode %}
+      {{ exceptions.raise_fail_on_schema_change() }}
+    {% elif on_schema_change == 'full_refresh' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) %}
+      {%- set full_refresh_mode = True -%}
+    {% endif %}
 
-{%- endmacro %}
+  {% endmacro %}
 
   {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}
   {%- set target_relation = api.Relation.create(database=database,

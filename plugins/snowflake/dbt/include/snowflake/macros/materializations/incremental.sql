@@ -6,17 +6,6 @@
   {%- set on_schema_change =  config.get('on_schema_change') -%}
   {%- set identifier = model['alias'] -%}
 
-
-  {% macro dbt__snowflake_has_schema_changed(on_schema_change, old_relation, target_relation) %}
-
-    {% if on_schema_change == 'fail' and adapter.has_schema_changed(old_relation=old_relation, to_relation=target_relation) and not full_refresh_mode %}
-      {{ exceptions.raise_fail_on_schema_change() }}
-    {% elif on_schema_change == 'full_refresh' and adapter.has_schema_changed(old_relation=old_relation, to_relation=target_relation) %}
-      {%- set full_refresh_mode = True -%}
-    {% endif %}
-
-  {% endmacro %}
-
   {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}
   {%- set target_relation = api.Relation.create(database=database,
                                                 schema=schema,
@@ -36,7 +25,11 @@
     {% do exceptions.raise_compiler_error(invalid_strategy_msg) %}
   {% endif %}
 
-  {{ dbt__snowflake_has_schema_changed(on_schema_change, old_relation, tmp_relation) }}
+  {% if on_schema_change == 'fail' and adapter.has_schema_changed(old_relation=old_relation, to_relation=tmp_relation) and not full_refresh_mode %}
+      {{ exceptions.raise_fail_on_schema_change() }}
+  {% elif on_schema_change == 'full_refresh' and adapter.has_schema_changed(old_relation=old_relation, to_relation=tmp_relation) %}
+      {%- set full_refresh_mode = True -%}
+  {% endif %}
 
   -- setup
   {{ run_hooks(pre_hooks, inside_transaction=False) }}

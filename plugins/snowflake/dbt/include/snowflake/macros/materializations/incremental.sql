@@ -3,8 +3,25 @@
 
   {%- set unique_key = config.get('unique_key') -%}
   {%- set full_refresh_mode = (flags.FULL_REFRESH == True) -%}
-  
+  {%- set on_schema_change =  config.get('on_schema_change') -%}
   {%- set identifier = model['alias'] -%}
+
+
+  -- Ideally, you should be able to override this macro to define what you want to consider a schema change. The default is to
+-- look at the following between the new relation and the old relation:
+--    1. Addition of new column
+--    2. Deletion of column
+--    3. Rename of column
+--    4. Changing of column data type
+{% macro dbt__default_has_schema_changed(on_schema_change, old_relation, target_relation) -%}
+
+{% if on_schema_change == 'fail' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) and not full_refresh_mode -%}
+  {{ exceptions.raise_fail_on_schema_change() }}
+{% elif on_schema_change == 'full_refresh' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) -%}
+  {%- set full_refresh_mode = True -%}
+{%- endif %}
+
+{%- endmacro %}
 
   {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}
   {%- set target_relation = api.Relation.create(database=database,
@@ -25,12 +42,15 @@
     {% do exceptions.raise_compiler_error(invalid_strategy_msg) %}
   {% endif %}
 
-  {%- if config.get('on_schema_change') == 'full_refresh' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) -%}
-    {%- set full_refresh_mode = True -%}
-  {%- endif -%}
-  {% if config.get('on_schema_change'== 'fail') and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) -%}
-    {{ exceptions.raise_fail_on_schema_change() }}
-  {%- endif %}
+  -- {% if config.get('on_schema_change') == 'full_refresh' and adapter.target_contains_schema_change(from_relation=old_relation, to_relation=target_relation) %}
+  -- {%- set full_refresh_mode = True -%}
+  -- {% endif %}
+
+  -- {% if config.get('on_schema_change'== 'fail') and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) %}
+  -- {{ exceptions.raise_fail_on_schema_change() }}
+  -- {% endif %}
+
+  {{ dbt__default_has_schema_changed(on_schema_change, old_relation, tmp_relation) }}
 
   -- setup
   {{ run_hooks(pre_hooks, inside_transaction=False) }}

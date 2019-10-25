@@ -13,7 +13,7 @@
 --    2. Deletion of column
 --    3. Rename of column
 --    4. Changing of column data type
-{% macro dbt__default_has_schema_changed(on_schema_change, old_relation, target_relation) -%}
+{% macro dbt__snowflake_has_schema_changed(on_schema_change, old_relation, target_relation) -%}
 
 {% if on_schema_change == 'fail' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) and not full_refresh_mode -%}
   {{ exceptions.raise_fail_on_schema_change() }}
@@ -42,7 +42,7 @@
     {% do exceptions.raise_compiler_error(invalid_strategy_msg) %}
   {% endif %}
 
-  {{ dbt__default_has_schema_changed(on_schema_change, old_relation, tmp_relation) }}
+  {{ dbt__snowflake_has_schema_changed(on_schema_change, old_relation, tmp_relation) }}
 
   -- setup
   {{ run_hooks(pre_hooks, inside_transaction=False) }}

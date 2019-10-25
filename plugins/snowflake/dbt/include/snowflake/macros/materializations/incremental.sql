@@ -3,9 +3,12 @@
 
   {%- set unique_key = config.get('unique_key') -%}
   {%- set full_refresh_mode = (flags.FULL_REFRESH == True) -%}
-  {%- if config.get('on_schema_change') == True -%}
+  {%- if config.get('on_schema_change') == 'full_refresh' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) -%}
     {%- set full_refresh_mode = True -%}
   {%- endif -%}
+  {% if config.get('on_schema_change'== 'fail') and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) -%}
+    {{ exceptions.raise_fail_on_schema_change() }}
+  {%- endif %}
   {%- set identifier = model['alias'] -%}
 
   {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}

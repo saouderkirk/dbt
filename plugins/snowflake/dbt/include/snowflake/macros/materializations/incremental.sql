@@ -7,12 +7,8 @@
   {%- set identifier = model['alias'] -%}
 
   {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}
-  {%- set target_relation = api.Relation.create(database=database,
-                                                schema=schema,
-                                                identifier=identifier,
-                                                type='table') -%}
-
-  {%- set tmp_relation = make_temp_relation(target_relation) %}
+  {%- set target_relation = api.Relation.create(database=database,schema=schema,identifier=identifier, type='table') -%}
+  {%- set tmp_relation = make_temp_relation(target_relation) -%}
 
   {#-- Find and validate the incremental strategy #}
   {%- set strategy = config.get("incremental_strategy", default="merge") -%}

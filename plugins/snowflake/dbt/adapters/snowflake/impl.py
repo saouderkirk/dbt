@@ -78,9 +78,9 @@ class SnowflakeAdapter(SQLAdapter):
         }
 
         # 1. The schema has changed if columns have been added or removed
-        if len(reference_columns) != len(target_columns):
-            logger.debug("Schema difference detected: Reason 1")
-            return True
+        # if len(reference_columns) != len(target_columns):
+        #     logger.debug("Schema difference detected: Reason 1")
+        #     return True
 
         for reference_column_name, reference_column in reference_columns.items():
             target_column = target_columns.get(reference_column_name)

@@ -3,6 +3,9 @@
 
   {%- set unique_key = config.get('unique_key') -%}
   {%- set full_refresh_mode = (flags.FULL_REFRESH == True) -%}
+  {%- if config.get('on_schema_change') == True -%}
+    {%- set full_refresh_mode = True -%}
+  {%- endif -%}
   {%- set identifier = model['alias'] -%}
 
   {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}

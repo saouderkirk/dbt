@@ -88,7 +88,7 @@ class SnowflakeAdapter(SQLAdapter):
             if target_column is None:
                 logger.debug("Schema difference detected: Reason 2a")
                 logger.debug("target = {}".format(target_columns))
-                logger.debug("target = {}".format(reference_columns))
+                logger.debug("reference = {}".format(reference_columns))
                 return True
 
             # 3/4. If the columns do not have the same data type and size (see core/dbt/schema.py for more details)
@@ -106,4 +106,6 @@ class SnowflakeAdapter(SQLAdapter):
 
         # Nothing has detected as changed
         logger.debug("No schema difference detected")
+        logger.debug("target = {}".format(target_columns))
+        logger.debug("reference = {}".format(reference_columns))
         return False

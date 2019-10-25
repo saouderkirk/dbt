@@ -9,9 +9,9 @@
 
   {% macro dbt__snowflake_has_schema_changed(on_schema_change, old_relation, target_relation) %}
 
-    {% if on_schema_change == 'fail' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) and not full_refresh_mode %}
+    {% if on_schema_change == 'fail' and adapter.has_schema_changed(old_relation=old_relation, to_relation=target_relation) and not full_refresh_mode %}
       {{ exceptions.raise_fail_on_schema_change() }}
-    {% elif on_schema_change == 'full_refresh' and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) %}
+    {% elif on_schema_change == 'full_refresh' and adapter.has_schema_changed(old_relation=old_relation, to_relation=target_relation) %}
       {%- set full_refresh_mode = True -%}
     {% endif %}
 

@@ -42,14 +42,6 @@
     {% do exceptions.raise_compiler_error(invalid_strategy_msg) %}
   {% endif %}
 
-  -- {% if config.get('on_schema_change') == 'full_refresh' and adapter.target_contains_schema_change(from_relation=old_relation, to_relation=target_relation) %}
-  -- {%- set full_refresh_mode = True -%}
-  -- {% endif %}
-
-  -- {% if config.get('on_schema_change'== 'fail') and adapter.target_contains_schema_change(old_relation=old_relation, to_relation=target_relation) %}
-  -- {{ exceptions.raise_fail_on_schema_change() }}
-  -- {% endif %}
-
   {{ dbt__default_has_schema_changed(on_schema_change, old_relation, tmp_relation) }}
 
   -- setup

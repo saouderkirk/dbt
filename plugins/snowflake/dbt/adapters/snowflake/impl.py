@@ -87,6 +87,8 @@ class SnowflakeAdapter(SQLAdapter):
             # 2a. The schema has changed if a reference column is not found in the target columns
             if target_column is None:
                 logger.debug("Schema difference detected: Reason 2a")
+                logger.debug('target' = target_columns)
+                logger.debug('ref'= reference_columns)
                 return True
 
             # 3/4. If the columns do not have the same data type and size (see core/dbt/schema.py for more details)

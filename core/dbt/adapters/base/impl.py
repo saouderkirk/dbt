@@ -627,7 +627,7 @@ class BaseAdapter(object):
                 got_value=old_relation,
                 expected_type=self.Relation)
 
-        return self.has_schema_changed(old_relation, to_relation)
+        return self.has_schema_changed(current=old_relation, goal= to_relation)
 
     def list_relations(self, database, schema):
         if self._schema_is_cached(database, schema):

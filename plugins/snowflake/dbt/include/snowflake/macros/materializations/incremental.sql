@@ -5,13 +5,9 @@
   {%- set full_refresh_mode = (flags.FULL_REFRESH == True) -%}
   {%- set on_schema_change =  config.get('on_schema_change') -%}
   {%- set identifier = model['alias'] -%}
-  {# -- {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}
-  {#-- {%- set target_relation = api.Relation.create(identifier=identifier, schema=schema, database=database,  type='table') -%}
-  {#-- {%- set tmp_relation = make_temp_relation(target_relation) %}
-
-  {% set target_relation = this %}
-  {% set existing_relation = load_relation(this) %}
-  {% set tmp_relation = make_temp_relation(this) %}
+  {%- set old_relation = adapter.get_relation(database=database, schema=schema, identifier=identifier) -%}
+  {%- set target_relation = api.Relation.create(identifier=identifier, schema=schema, database=database,  type='table') -%}
+  {%- set tmp_relation = make_temp_relation(target_relation) %}
 
   {#-- Find and validate the incremental strategy #}
   {%- set strategy = config.get("incremental_strategy", default="merge") -%}

@@ -33,7 +33,7 @@
   {% set existing_relation = load_relation(this) %}
   {% set tmp_relation = make_temp_relation(this) %}
 
-  {%- set on_schema_change =  config.get('on_schema_change') -%}
+  {%- set on_schema_change = config.get('on_schema_change') -%}
   {%- set identifier = model['alias'] -%}
 
 

@@ -3,7 +3,7 @@
 
   {% set unique_key = config.get('unique_key') %}
   {% set full_refresh_mode = flags.FULL_REFRESH %}
-  {% set on_schema_change = (config.get('on_schema_change') %}
+  {% set on_schema_change = config.get('on_schema_change') %}
 
   {%- set exists_as_table = (old_relation is not none and old_relation.is_table) -%}
   {%- set exists_not_as_table = (old_relation is not none and not old_relation.is_table) -%}

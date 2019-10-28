@@ -14,10 +14,10 @@
 
   {#-- check existing with temp for scheam changes and handle -- #}
 
-  {% if old_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(old_relation=existing_relation, to_relation=tmp_relation) %}
-    {% if on_schema_change = 'full_refresh'  %}
+  {% if old_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(old_relation=existing_relation, to_relation=tmp_relation) -%}
+    {% if on_schema_change == 'full_refresh'  -%}
       {%- set full_refresh_mode = True -%}
-    {% elif on_schema_change = 'fail' %}
+    {% elif on_schema_change == 'fail' -%}
       {{ exceptions.raise_fail_on_schema_change() }}
     {% endif %}
   {% endif %}

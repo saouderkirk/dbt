@@ -48,7 +48,7 @@
   -- `BEGIN` happens here:
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
-  {#-- check existing with temp for scheam changes and handle -- #}
+  {#-- check target_relation against temp_relation and on_schema_change config options -- #}
 
   {% if existing_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(target_relation=target_relation, temp_relation = tmp_relation) %}
     {% if on_schema_change == 'full_refresh'  %}
@@ -72,7 +72,7 @@
     {% do adapter.expand_target_column_types(
            from_relation=tmp_relation,
            to_relation=target_relation) %}
-    {% set dest_columns = adapter.get_columns_in_relation(target_relation) %}
+    {% set dest_columns = adapter.get_columns_in_relation(temp_relation) %} --{# testing target->temp  #}
     {% set build_sql = dbt_snowflake_get_incremental_sql(strategy, tmp_relation, target_relation, unique_key, dest_columns) %}
   {% endif %}
 

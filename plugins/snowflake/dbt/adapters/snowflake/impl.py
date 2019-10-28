@@ -82,8 +82,8 @@ class SnowflakeAdapter(SQLAdapter):
         # 1. The schema has changed if columns have been added or removed
         if len(reference_columns) != len(target_columns):
             logger.debug("Schema difference detected: Reason 1")
-            logger.debug("target = {}".format(target_columns))
-            logger.debug("reference = {}".format(reference_columns))
+            logger.debug("target_ref = {}".format(target_columns))
+            logger.debug("temp_ref = {}".format(reference_columns))
             return True
 
         for reference_column_name, reference_column in reference_columns.items():
@@ -91,15 +91,15 @@ class SnowflakeAdapter(SQLAdapter):
             # 2a. The schema has changed if a reference column is not found in the target columns
             if target_column is None:
                 logger.debug("Schema difference detected: Reason 2a")
-                logger.debug("target = {}".format(target_columns))
-                logger.debug("reference = {}".format(reference_columns))
+                logger.debug("target_ref = {}".format(target_columns))
+                logger.debug("temp_ref = {}".format(reference_columns))
                 return True
 
             # 3/4. If the columns do not have the same data type and size (see core/dbt/schema.py for more details)
             if reference_column.data_type != target_column.data_type:
                 logger.debug("Schema difference detected: Reason 3/4")
-                logger.debug("target = {}".format(target_columns))
-                logger.debug("reference = {}".format(reference_columns))
+                logger.debug("target_ref = {}".format(target_columns))
+                logger.debug("temp_ref = {}".format(reference_columns))
                 return True
 
         for i, target_column_name in enumerate(target_columns):
@@ -108,14 +108,14 @@ class SnowflakeAdapter(SQLAdapter):
             # 2b. The schema has changed if a target column is not found in the reference columns
             if reference_column is None:
                 logger.debug("Schema difference detected: Reason 2b")
-                logger.debug("target = {}".format(target_columns))
-                logger.debug("reference = {}".format(reference_columns))
+                logger.debug("target_ref = {}".format(target_columns))
+                logger.debug("temp_ref = {}".format(reference_columns))
                 return True
 
         # Nothing has detected as changed
         logger.debug("No schema difference detected")
-        logger.debug("target = {}".format(target_columns))
-        logger.debug("reference = {}".format(reference_columns))
+        logger.debug("target_ref = {}".format(target_columns))
+        logger.debug("temp_ref = {}".format(reference_columns))
         return False
 
     def _get_warehouse(self) -> str:

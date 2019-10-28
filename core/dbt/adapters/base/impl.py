@@ -518,7 +518,7 @@ class BaseAdapter(metaclass=AdapterMeta):
         )
 
     @abc.abstractmethod
-    def has_schema_changed(self, goal, current):
+    def has_schema_changed(self, temp_relation, target_relation):
         """ This can be sepearater methods for each way the scheam can differ, but
         for right now just combine them as a default
         """

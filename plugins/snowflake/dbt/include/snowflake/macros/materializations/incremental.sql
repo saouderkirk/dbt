@@ -37,15 +37,7 @@
   {%- set identifier = model['alias'] -%}
 
 
-  {#-- check existing with temp for scheam changes and handle -- #}
-
-  {% if existing_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(target_relation=target_relation, temp_relation = tmp_relation) %}
-    {% if on_schema_change == 'full_refresh'  %}
-      {%- set full_refresh_mode = True -%}
-    {% elif on_schema_change == 'fail' %}
-      {{ exceptions.raise_fail_on_schema_change() }}
-    {% endif %}
-  {% endif %}
+ 
 
   {#-- Validate early so we don't run SQL if the strategy is invalid --#}
   {% set strategy = dbt_snowflake_validate_get_incremental_strategy(config) -%}
@@ -55,6 +47,16 @@
 
   -- `BEGIN` happens here:
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
+
+  {#-- check existing with temp for scheam changes and handle -- #}
+
+  {% if existing_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(target_relation=target_relation, temp_relation = tmp_relation) %}
+    {% if on_schema_change == 'full_refresh'  %}
+      {%- set full_refresh_mode = True -%}
+    {% elif on_schema_change == 'fail' %}
+      {{ exceptions.raise_fail_on_schema_change() }}
+    {% endif %}
+  {% endif %}
 
   {% if existing_relation is none %}
     {% set build_sql = create_table_as(False, target_relation, sql) %}

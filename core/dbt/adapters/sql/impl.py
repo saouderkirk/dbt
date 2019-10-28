@@ -114,7 +114,7 @@ class SQLAdapter(BaseAdapter):
 
                 self.alter_column_type(current, column_name, new_type)
 
-    def has_schema_changed(self, goal, current):
+    def has_schema_changed(self, temp_relation, target_relation):
         """
         Look for schema changes between the target columns and reference columns
         Step through each column and return that a schema change *has* happened
@@ -126,7 +126,7 @@ class SQLAdapter(BaseAdapter):
         """
         reference_columns = {
             c.name: c for c in
-            self.get_columns_in_relation(goal)
+            self.get_columns_in_relation(temp_relation)
         }
 
         # Theoretically this works, but postgres temporary tables are held within their
@@ -135,7 +135,7 @@ class SQLAdapter(BaseAdapter):
         # in this code path.
         target_columns = {
             c.name: c for c in
-            self.get_columns_in_relation(current)
+            self.get_columns_in_relation(target_relation)
         }
 
         # 1. The schema has changed if columns have been added or removed

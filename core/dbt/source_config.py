@@ -16,6 +16,7 @@ class SourceConfig:
         'unique_key',
         'database',
         'severity',
+        'on_schema_change',
 
         'incremental_strategy',
 

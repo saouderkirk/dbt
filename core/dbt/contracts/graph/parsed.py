@@ -29,66 +29,6 @@ class All(StrEnum):
     All = 'all'
 
 
-CONFIG_CONTRACT = {
-    'type': 'object',
-    'additionalProperties': True,
-    'properties': {
-        'enabled': {
-            'type': 'boolean',
-        },
-        'materialized': {
-            'type': 'string',
-        },
-        'persist_docs': {
-            'type': 'object',
-            'additionalProperties': True,
-        },
-        'post-hook': {
-            'type': 'array',
-            'items': HOOK_CONTRACT,
-        },
-        'pre-hook': {
-            'type': 'array',
-            'items': HOOK_CONTRACT,
-        },
-        'vars': {
-            'type': 'object',
-            'additionalProperties': True,
-        },
-        'quoting': {
-            'type': 'object',
-            'additionalProperties': True,
-        },
-        'column_types': {
-            'type': 'object',
-            'additionalProperties': True,
-        },
-        'tags': {
-            'anyOf': [
-                {
-                    'type': 'array',
-                    'items': {
-                        'type': 'string'
-                    },
-                },
-                {
-                    'type': 'string'
-                }
-            ]
-        },
-        'on_schema_change': {
-            'type': 'string'
-        },
-        'severity': {
-            'type': 'string',
-            'pattern': '([eE][rR][rR][oO][rR]|[wW][aA][rR][nN])',
-        },
-    },
-    'required': [
-        'enabled', 'materialized', 'post-hook', 'pre-hook', 'vars',
-        'quoting', 'column_types', 'tags', 'persist_docs'
-    ]
-}
 @dataclass
 class Hook(JsonSchemaMixin, Replaceable):
     sql: str
@@ -121,6 +61,7 @@ class NodeConfig(
     vars: Dict[str, Any] = field(default_factory=dict)
     quoting: Dict[str, Any] = field(default_factory=dict)
     column_types: Dict[str, Any] = field(default_factory=dict)
+    on_schema_change: Optional[str] = None
     tags: Union[List[str], str] = field(default_factory=list_str)
 
     @classmethod

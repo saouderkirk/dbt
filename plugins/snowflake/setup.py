@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-from setuptools import find_packages
-from distutils.core import setup
+from setuptools import find_namespace_packages
+from setuptools import setup
 import os
 
 package_name = "dbt-snowflake"
-package_version = "0.14.1"
+package_version = "0.15.0b2"
 description = """The snowflake adapter plugin for dbt (data build tool)"""
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
@@ -20,7 +20,7 @@ setup(
     author="Fishtown Analytics",
     author_email="info@fishtownanalytics.com",
     url="https://github.com/fishtown-analytics/dbt",
-    packages=find_packages(),
+    packages=find_namespace_packages(include=['dbt', 'dbt.*']),
     package_data={
         'dbt': [
             'include/snowflake/dbt_project.yml',
@@ -30,6 +30,7 @@ setup(
     },
     install_requires=[
         'dbt-core=={}'.format(package_version),
-        'snowflake-connector-python>=1.6.12',
-    ]
+        'snowflake-connector-python>=1.6.12,<2.1',
+    ],
+    zip_safe=False,
 )

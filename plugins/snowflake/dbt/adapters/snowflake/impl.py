@@ -1,10 +1,11 @@
-from __future__ import absolute_import
+from typing import Mapping, Any, Optional
 
 from dbt.adapters.sql import SQLAdapter
 from dbt.adapters.snowflake import SnowflakeConnectionManager
 from dbt.adapters.snowflake import SnowflakeRelation
 from dbt.utils import filter_null_values
 from dbt.logger import GLOBAL_LOGGER as logger
+from dbt.exceptions import RuntimeException
 
 
 GET_COLUMNS_IN_RELATION_MACRO_NAME = 'snowflake__get_columns_in_relation'
@@ -14,7 +15,8 @@ class SnowflakeAdapter(SQLAdapter):
     ConnectionManager = SnowflakeConnectionManager
 
     AdapterSpecificConfigs = frozenset(
-        {"transient", "cluster_by", "automatic_clustering"}
+        {"transient", "cluster_by", "automatic_clustering", "secure",
+         "copy_grants", "warehouse"}
     )
 
     @classmethod
@@ -28,15 +30,15 @@ class SnowflakeAdapter(SQLAdapter):
         lowered = table.rename(
             column_names=[c.lower() for c in table.column_names]
         )
-        return super(SnowflakeAdapter, cls)._catalog_filter_table(
-            lowered, manifest
-        )
+        return super()._catalog_filter_table(lowered, manifest)
+
     
     def get_columns_in_relation(self, relation):
         return self.execute_macro(
             GET_COLUMNS_IN_RELATION_MACRO_NAME,
             kwargs={'relation': relation}
         )
+
 
     def _make_match_kwargs(self, database, schema, identifier):
         quoting = self.config.quoting
@@ -115,3 +117,34 @@ class SnowflakeAdapter(SQLAdapter):
         logger.debug("target = {}".format(target_columns))
         logger.debug("reference = {}".format(reference_columns))
         return False
+
+    def _get_warehouse(self) -> str:
+        _, table = self.execute(
+            'select current_warehouse() as warehouse',
+            fetch=True
+        )
+        if len(table) == 0 or len(table[0]) == 0:
+            # can this happen?
+            raise RuntimeException(
+                'Could not get current warehouse: no results'
+            )
+        return str(table[0][0])
+
+    def _use_warehouse(self, warehouse: str):
+        """Use the given warehouse. Quotes are never applied."""
+        self.execute('use warehouse {}'.format(warehouse))
+
+    def pre_model_hook(self, config: Mapping[str, Any]) -> Optional[str]:
+        default_warehouse = self.config.credentials.warehouse
+        warehouse = config.get('warehouse', default_warehouse)
+        if warehouse == default_warehouse or warehouse is None:
+            return None
+        previous = self._get_warehouse()
+        self._use_warehouse(warehouse)
+        return previous
+
+    def post_model_hook(
+        self, config: Mapping[str, Any], context: Optional[str]
+    ) -> None:
+        if context is not None:
+            self._use_warehouse(context)

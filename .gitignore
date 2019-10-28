@@ -23,6 +23,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+*.mypy_cache/
 logs/
 
 # PyInstaller
@@ -46,6 +47,9 @@ coverage.xml
 *,cover
 .hypothesis/
 test.env
+
+# Mypy
+.mypy_cache/
 
 # Translations
 *.mo
@@ -79,3 +83,5 @@ target/
 
 # envs
 /env/
+# pycharm
+.idea/

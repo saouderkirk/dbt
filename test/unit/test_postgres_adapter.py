@@ -1,12 +1,14 @@
-import mock
 import unittest
+from unittest import mock
 
 import dbt.flags as flags
+import dbt.parser.manifest
+from dbt.task.debug import DebugTask
 
-import dbt.adapters
 from dbt.adapters.postgres import PostgresAdapter
-from dbt.exceptions import ValidationException
+from dbt.exceptions import ValidationException, DbtConfigError
 from dbt.logger import GLOBAL_LOGGER as logger  # noqa
+from dbt.parser.results import ParseResult
 from psycopg2 import extensions as psycopg2_extensions
 from psycopg2 import DatabaseError, Error
 import agate
@@ -96,7 +98,6 @@ class TestPostgresAdapter(unittest.TestCase):
 
         master.handle.get_backend_pid.assert_not_called()
 
-
     @mock.patch('dbt.adapters.postgres.connections.psycopg2')
     def test_default_keepalive(self, psycopg2):
         connection = self.adapter.acquire_connection('dummy')
@@ -111,9 +112,7 @@ class TestPostgresAdapter(unittest.TestCase):
 
     @mock.patch('dbt.adapters.postgres.connections.psycopg2')
     def test_changed_keepalive(self, psycopg2):
-        self.config.credentials = self.config.credentials.incorporate(
-            keepalives_idle=256
-        )
+        self.config.credentials = self.config.credentials.replace(keepalives_idle=256)
         connection = self.adapter.acquire_connection('dummy')
 
         psycopg2.connect.assert_called_once_with(
@@ -127,9 +126,7 @@ class TestPostgresAdapter(unittest.TestCase):
 
     @mock.patch('dbt.adapters.postgres.connections.psycopg2')
     def test_search_path(self, psycopg2):
-        self.config.credentials = self.config.credentials.incorporate(
-            search_path="test"
-        )
+        self.config.credentials = self.config.credentials.replace(search_path="test")
         connection = self.adapter.acquire_connection('dummy')
 
         psycopg2.connect.assert_called_once_with(
@@ -143,9 +140,7 @@ class TestPostgresAdapter(unittest.TestCase):
 
     @mock.patch('dbt.adapters.postgres.connections.psycopg2')
     def test_schema_with_space(self, psycopg2):
-        self.config.credentials = self.config.credentials.incorporate(
-            search_path="test test"
-        )
+        self.config.credentials = self.config.credentials.replace(search_path="test test")
         connection = self.adapter.acquire_connection('dummy')
 
         psycopg2.connect.assert_called_once_with(
@@ -159,9 +154,7 @@ class TestPostgresAdapter(unittest.TestCase):
 
     @mock.patch('dbt.adapters.postgres.connections.psycopg2')
     def test_set_zero_keepalive(self, psycopg2):
-        self.config.credentials = self.config.credentials.incorporate(
-            keepalives_idle=0
-        )
+        self.config.credentials = self.config.credentials.replace(keepalives_idle=0)
         connection = self.adapter.acquire_connection('dummy')
 
         psycopg2.connect.assert_called_once_with(
@@ -200,17 +193,19 @@ class TestConnectingPostgresAdapter(unittest.TestCase):
     def setUp(self):
         flags.STRICT_MODE = False
 
+        self.target_dict = {
+            'type': 'postgres',
+            'dbname': 'postgres',
+            'user': 'root',
+            'host': 'thishostshouldnotexist',
+            'pass': 'password',
+            'port': 5432,
+            'schema': 'public'
+        }
+
         profile_cfg = {
             'outputs': {
-                'test': {
-                    'type': 'postgres',
-                    'dbname': 'postgres',
-                    'user': 'root',
-                    'host': 'thishostshouldnotexist',
-                    'pass': 'password',
-                    'port': 5432,
-                    'schema': 'public'
-                }
+                'test': self.target_dict,
             },
             'target': 'test'
         }
@@ -241,10 +236,15 @@ class TestConnectingPostgresAdapter(unittest.TestCase):
         self.adapter.acquire_connection()
         inject_adapter(self.adapter)
 
+        self.load_patch = mock.patch('dbt.parser.manifest.make_parse_result')
+        self.mock_parse_result = self.load_patch.start()
+        self.mock_parse_result.return_value = ParseResult.rpc()
+
     def tearDown(self):
         # we want a unique self.handle every time.
         self.adapter.cleanup_connections()
         self.patcher.stop()
+        self.load_patch.stop()
 
     def test_quoting_on_drop_schema(self):
         self.adapter.drop_schema(database='postgres', schema='test_schema')
@@ -302,3 +302,23 @@ class TestConnectingPostgresAdapter(unittest.TestCase):
         self.mock_execute.assert_has_calls([
             mock.call('alter table "postgres"."test_schema".table_a rename to table_b', None)
         ])
+
+    def test_debug_connection_ok(self):
+        DebugTask.validate_connection(self.target_dict)
+        self.mock_execute.assert_has_calls([
+            mock.call('select 1 as id', None)
+        ])
+
+    def test_debug_connection_fail_nopass(self):
+        del self.target_dict['pass']
+        with self.assertRaises(DbtConfigError):
+            DebugTask.validate_connection(self.target_dict)
+
+        def test_connection_fail_select(self):
+            self.mock_execute.side_effect = DatabaseError()
+            with self.assertRaises(DbtConfigError):
+                DebugTask.validate_connection(self.target_dict)
+            self.mock_execute.assert_has_calls([
+                mock.call('select 1 as id', None)
+            ])
+

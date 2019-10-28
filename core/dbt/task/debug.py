@@ -9,7 +9,7 @@ import dbt.config
 import dbt.utils
 import dbt.exceptions
 from dbt.links import ProfileConfigDocs
-from dbt.adapters.factory import get_adapter
+from dbt.adapters.factory import get_adapter, register_adapter
 from dbt.version import get_installed_version
 from dbt.config import Project, Profile
 from dbt.clients.yaml_helper import load_yaml_text
@@ -59,7 +59,7 @@ FILE_NOT_FOUND = 'file not found'
 
 class DebugTask(BaseTask):
     def __init__(self, args, config):
-        super(DebugTask, self).__init__(args, config)
+        super().__init__(args, config)
         self.profiles_dir = getattr(self.args, 'profiles_dir',
                                     dbt.config.PROFILES_DIR)
         self.profile_path = os.path.join(self.profiles_dir, 'profiles.yml')
@@ -265,16 +265,28 @@ class DebugTask(BaseTask):
         print(self.profile_fail_details)
         print('')
 
-    def _connection_result(self):
-        adapter = get_adapter(self.profile)
+    @staticmethod
+    def attempt_connection(profile):
+        """Return a string containing the error message, or None if there was
+        no error.
+        """
+        register_adapter(profile)
+        adapter = get_adapter(profile)
         try:
             with adapter.connection_named('debug'):
                 adapter.execute('select 1 as id')
         except Exception as exc:
-            self.messages.append(COULD_NOT_CONNECT_MESSAGE.format(
+            return COULD_NOT_CONNECT_MESSAGE.format(
                 err=str(exc),
-                url=ProfileConfigDocs
-            ))
+                url=ProfileConfigDocs,
+            )
+
+        return None
+
+    def _connection_result(self):
+        result = self.attempt_connection(self.profile)
+        if result is not None:
+            self.messages.append(result)
             return red('ERROR')
         return green('OK connection ok')
 
@@ -286,3 +298,28 @@ class DebugTask(BaseTask):
             print('  {}: {}'.format(k, v))
         print('  Connection test: {}'.format(self._connection_result()))
         print('')
+
+    @classmethod
+    def validate_connection(cls, target_dict):
+        """Validate a connection dictionary. On error, raises a DbtConfigError.
+        """
+        target_name = 'test'
+        # make a fake profile that we can parse
+        profile_data = {
+            'outputs': {
+                target_name: target_dict,
+            },
+        }
+        # this will raise a DbtConfigError on failure
+        profile = Profile.from_raw_profile_info(
+            raw_profile=profile_data,
+            profile_name='',
+            target_override=target_name,
+            cli_vars={},
+        )
+        result = cls.attempt_connection(profile)
+        if result is not None:
+            raise dbt.exceptions.DbtProfileError(
+                result,
+                result_type='connection_failure'
+            )

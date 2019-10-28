@@ -50,7 +50,7 @@
 
   {#-- check existing with temp for scheam changes and handle -- #}
 
-  {% if existing_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(target_relation=target_relation, temp_relation = tmp_relation) %}
+  {% if existing_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(target_relation=target_relation, temp_relation = existing_relation) %}
     {% if on_schema_change == 'full_refresh'  %}
       {%- set full_refresh_mode = True -%}
     {% elif on_schema_change == 'fail' %}

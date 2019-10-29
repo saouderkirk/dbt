@@ -74,7 +74,7 @@
     {% do adapter.expand_target_column_types(
            from_relation=tmp_relation,
            to_relation=target_relation) %}
-    {% set dest_columns = adapter.get_columns_in_relation(temp_relation) %} --{# testing target->temp  #}
+    {% set dest_columns = adapter.get_columns_in_relation(tmp_relation) %} 
     {% set build_sql = dbt_snowflake_get_incremental_sql(strategy, tmp_relation, target_relation, unique_key, dest_columns) %}
   {% endif %}
 

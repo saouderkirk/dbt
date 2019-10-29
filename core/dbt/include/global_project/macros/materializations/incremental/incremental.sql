@@ -12,15 +12,7 @@
   {% set existing_relation = load_relation(this) %}
   {% set tmp_relation = make_temp_relation(this) %}
 
-  {#-- check existing with temp for scheam changes and handle -- #}
-
-  {% if existing_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(target_relation=target_relation, temp_relation=tmp_relation) -%}
-    {% if on_schema_change == 'full_refresh'  -%}
-      {%- set full_refresh_mode = True -%}
-    {% elif on_schema_change == 'fail' -%}
-      {{ exceptions.raise_fail_on_schema_change() }}
-    {% endif %}
-  {% endif %}
+  
 
 
   {# -- set the type so our rename / drop uses the correct syntax #}
@@ -41,6 +33,18 @@
       {% do to_drop.append(backup_relation) %}
   {% else %}
       {% set tmp_relation = make_temp_relation(target_relation) %}
+
+      {#-- check existing with temp for scheam changes and handle -- #}
+      {% if existing_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(target_relation=target_relation, temp_relation=tmp_relation) -%}
+        {% if on_schema_change == 'full_refresh'  -%}
+          {% do adapter.rename_relation(target_relation, backup_relation) %}
+          {% set build_sql = create_table_as(False, target_relation, sql) %}
+          {% do to_drop.append(backup_relation) %}
+        {% elif on_schema_change == 'fail' -%}
+          {{ exceptions.raise_fail_on_schema_change() }}
+        {% endif %}
+      {% endif %}
+
       {% do run_query(create_table_as(True, tmp_relation, sql)) %}
       {% do adapter.expand_target_column_types(
              from_relation=tmp_relation,

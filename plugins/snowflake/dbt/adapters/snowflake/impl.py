@@ -67,12 +67,12 @@ class SnowflakeAdapter(SQLAdapter):
         """
         reference_columns = {
             c.name: c for c in
-            self.get_columns_in_relation(temp_relation)
+            self.get_columns_in_relation(relation = temp_relation)
         }
 
         target_columns = {
             c.name: c for c in
-            self.get_columns_in_relation(target_relation)
+            self.get_columns_in_relation(relation = target_relation)
         }
 
         # 1. The schema has changed if columns have been added or removed

@@ -50,13 +50,6 @@
 
   {#-- check target_relation against temp_relation and on_schema_change config options -- #}
 
-  {% if existing_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(target_relation=target_relation, temp_relation = tmp_relation) %}
-    {% if on_schema_change == 'full_refresh'  %}
-      {%- set full_refresh_mode = True -%}
-    {% elif on_schema_change == 'fail' %}
-      {{ exceptions.raise_fail_on_schema_change() }}
-    {% endif %}
-  {% endif %}
 
   {% if existing_relation is none %}
     {% set build_sql = create_table_as(False, target_relation, sql) %}

@@ -70,10 +70,6 @@ class SnowflakeAdapter(SQLAdapter):
             self.get_columns_in_relation(temp_relation)
         }
 
-        # Theoretically this works, but postgres temporary tables are held within their
-        # own schema, so it's not possible to track the differences.
-        # This logic should work with Snowflake based on manual testing, but not confirmed
-        # in this code path.
         target_columns = {
             c.name: c for c in
             self.get_columns_in_relation(target_relation)

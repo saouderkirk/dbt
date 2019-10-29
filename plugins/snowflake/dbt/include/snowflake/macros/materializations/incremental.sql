@@ -69,6 +69,15 @@
     {% set build_sql = create_table_as(False, target_relation, sql) %}
   {% else %}
     {% do run_query(create_table_as(True, tmp_relation, sql)) %}
+
+    {% if adapter.target_contains_schema_change(target_relation=target_relation, temp_relation = tmp_relation) %}
+      {% if on_schema_change == 'full_refresh'  %}
+        {% set build_sql = create_table_as(False, target_relation, sql) %}
+      {% elif on_schema_change == 'fail' %}
+        {{ exceptions.raise_fail_on_schema_change() }}
+      {% endif %}
+    {% endif %}
+
     {% do adapter.expand_target_column_types(
            from_relation=tmp_relation,
            to_relation=target_relation) %}

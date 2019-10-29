@@ -91,12 +91,13 @@ class SnowflakeAdapter(SQLAdapter):
                 logger.debug("temp_ref = {}".format(reference_columns))
                 return True
 
+            # TODO - find a less sensitive way of comparing the data types
             # 3/4. If the columns do not have the same data type and size (see core/dbt/schema.py for more details)
-            if reference_column.data_type != target_column.data_type:
-                logger.debug("Schema difference detected: Reason 3/4")
-                logger.debug("target_ref = {}".format(target_columns))
-                logger.debug("temp_ref = {}".format(reference_columns))
-                return True
+            # if reference_column.data_type != target_column.data_type:
+            #     logger.debug("Schema difference detected: Reason 3/4")
+            #     logger.debug("target_ref = {}".format(target_columns))
+            #     logger.debug("temp_ref = {}".format(reference_columns))
+            #     return True
 
         for i, target_column_name in enumerate(target_columns):
             reference_column = reference_columns.get(target_column_name)

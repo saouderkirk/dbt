@@ -69,13 +69,13 @@
       {% elif on_schema_change == 'fail' %}
         {{ exceptions.raise_fail_on_schema_change() }}
       {% endif %}
+    {% else %}
+      {% do adapter.expand_target_column_types(
+            from_relation=tmp_relation,
+            to_relation=target_relation) %}
+      {% set dest_columns = adapter.get_columns_in_relation(tmp_relation) %} 
+      {% set build_sql = dbt_snowflake_get_incremental_sql(strategy, tmp_relation, target_relation, unique_key, dest_columns) %}
     {% endif %}
-
-    {% do adapter.expand_target_column_types(
-           from_relation=tmp_relation,
-           to_relation=target_relation) %}
-    {% set dest_columns = adapter.get_columns_in_relation(tmp_relation) %} 
-    {% set build_sql = dbt_snowflake_get_incremental_sql(strategy, tmp_relation, target_relation, unique_key, dest_columns) %}
   {% endif %}
 
   {%- call statement('main') -%}

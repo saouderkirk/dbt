@@ -34,8 +34,8 @@
   {% else %}
       {% set tmp_relation = make_temp_relation(target_relation) %}
 
-      {#-- check existing with temp for scheam changes and handle -- #}
-      {% if existing_relation is not none and not full_refresh_mode and adapter.target_contains_schema_change(target_relation=target_relation, temp_relation=tmp_relation) -%}
+      -- {# check existing with temp for scheam changes and handle #}
+      {% if adapter.target_contains_schema_change(target_relation=target_relation, temp_relation=tmp_relation) -%}
         {% if on_schema_change == 'full_refresh'  -%}
           {% do adapter.rename_relation(target_relation, backup_relation) %}
           {% set build_sql = create_table_as(False, target_relation, sql) %}
@@ -43,13 +43,13 @@
         {% elif on_schema_change == 'fail' -%}
           {{ exceptions.raise_fail_on_schema_change() }}
         {% endif %}
+      {% else %}
+        {% do run_query(create_table_as(True, tmp_relation, sql)) %}
+        {% do adapter.expand_target_column_types(
+              from_relation=tmp_relation,
+              to_relation=target_relation) %}
+        {% set build_sql = incremental_upsert(tmp_relation, target_relation, unique_key=unique_key) %}
       {% endif %}
-
-      {% do run_query(create_table_as(True, tmp_relation, sql)) %}
-      {% do adapter.expand_target_column_types(
-             from_relation=tmp_relation,
-             to_relation=target_relation) %}
-      {% set build_sql = incremental_upsert(tmp_relation, target_relation, unique_key=unique_key) %}
   {% endif %}
 
   {% call statement("main") %}

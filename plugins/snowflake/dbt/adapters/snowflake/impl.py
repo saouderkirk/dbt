@@ -77,16 +77,16 @@ class SnowflakeAdapter(SQLAdapter):
 
         # 1. The schema has changed if columns have been added or removed
         if len(reference_columns) != len(target_columns):
-            logger.debug("Schema difference detected: Reason 1")
-            logger.debug("target_ref = {}".format(target_columns))
-            logger.debug("temp_ref = {}".format(reference_columns))
+            logger.debug("Schema difference detected: column count in reference does not match target. reference columns: {}  target columns: {} ".format(reference_columns, target_columns))
+            logger.debug("target_ref = {} ".format(target_columns))
+            logger.debug("temp_ref = {} ".format(reference_columns))
             return True
 
         for reference_column_name, reference_column in reference_columns.items():
             target_column = target_columns.get(reference_column_name)
             # 2a. The schema has changed if a reference column is not found in the target columns
             if target_column is None:
-                logger.debug("Schema difference detected: Reason 2a")
+                logger.debug("Schema difference detected: reference column {} not found in target".format(reference_column_name))
                 logger.debug("target_ref = {}".format(target_columns))
                 logger.debug("temp_ref = {}".format(reference_columns))
                 return True
@@ -104,7 +104,7 @@ class SnowflakeAdapter(SQLAdapter):
             target_column = target_columns.get(target_column_name)
             # 2b. The schema has changed if a target column is not found in the reference columns
             if reference_column is None:
-                logger.debug("Schema difference detected: Reason 2b")
+                logger.debug("Schema difference detected: target column {} not found in reference".format(target_column_name))
                 logger.debug("target_ref = {}".format(target_columns))
                 logger.debug("temp_ref = {}".format(reference_columns))
                 return True

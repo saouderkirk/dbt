@@ -1,4 +1,5 @@
 import agate
+import re
 from typing import Any, Optional, Tuple, Type
 
 import dbt.clients.agate_helper

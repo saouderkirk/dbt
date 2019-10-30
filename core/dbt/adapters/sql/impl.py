@@ -150,7 +150,7 @@ class SQLAdapter(BaseAdapter):
                 logger.debug("temp_ref = {}".format(reference_columns))
                 return True
 
-            # TODO - find a less sensitive way of comparing the data types
+            # TODO - find a less sensitive way of comparing the data types, ignoring for now since DBT will automatically resolve minor differences in the datatypes 
             # 3/4. If the columns do not have the same data type and size (see core/dbt/schema.py for more details)
             # if reference_column.data_type != target_column.data_type:
             #     logger.debug("Schema difference detected: Reason 3/4")

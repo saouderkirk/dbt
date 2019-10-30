@@ -93,7 +93,6 @@ class SnowflakeAdapter(SQLAdapter):
                 logger.debug("temp_ref = {}".format(reference_columns))
                 return True
 
-            # 
             # 3/4. If the columns do not have the same data type and size (see core/dbt/schema.py for more details) 
             refernce_type = re.findall(r"^(\w*)",reference_column.data_type) # just get the name of datatype, not size/precision
             target_type = re.findall(r"^(\w*)",target_column.data_type)

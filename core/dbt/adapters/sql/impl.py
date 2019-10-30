@@ -126,45 +126,52 @@ class SQLAdapter(BaseAdapter):
         """
         reference_columns = {
             c.name: c for c in
-            self.get_columns_in_relation(temp_relation)
+            self.get_columns_in_relation(relation = temp_relation)
         }
 
-        # Theoretically this works, but postgres temporary tables are held within their
-        # own schema, so it's not possible to track the differences.
-        # This logic should work with Snowflake based on manual testing, but not confirmed
-        # in this code path.
         target_columns = {
             c.name: c for c in
-            self.get_columns_in_relation(target_relation)
+            self.get_columns_in_relation(relation = target_relation)
         }
 
         # 1. The schema has changed if columns have been added or removed
         if len(reference_columns) != len(target_columns):
-            logger.debug("Schema difference detected: Reason 1")
+            logger.debug("Schema difference detected: column count in reference does not match target. reference columns: {}  target columns: {} ".format(reference_columns, target_columns))
+            logger.debug("target_ref = {} ".format(target_columns))
+            logger.debug("temp_ref = {} ".format(reference_columns))
             return True
 
         for reference_column_name, reference_column in reference_columns.items():
             target_column = target_columns.get(reference_column_name)
             # 2a. The schema has changed if a reference column is not found in the target columns
             if target_column is None:
-                logger.debug("Schema difference detected: Reason 2a")
+                logger.debug("Schema difference detected: reference column {} not found in target".format(reference_column_name))
+                logger.debug("target_ref = {}".format(target_columns))
+                logger.debug("temp_ref = {}".format(reference_columns))
                 return True
 
+            # TODO - find a less sensitive way of comparing the data types
             # 3/4. If the columns do not have the same data type and size (see core/dbt/schema.py for more details)
-            if reference_column.data_type != target_column.data_type:
-                logger.debug("Schema difference detected: Reason 3/4")
-                return True
+            # if reference_column.data_type != target_column.data_type:
+            #     logger.debug("Schema difference detected: Reason 3/4")
+            #     logger.debug("target_ref = {}".format(target_columns))
+            #     logger.debug("temp_ref = {}".format(reference_columns))
+            #     return True
 
         for i, target_column_name in enumerate(target_columns):
             reference_column = reference_columns.get(target_column_name)
             target_column = target_columns.get(target_column_name)
             # 2b. The schema has changed if a target column is not found in the reference columns
             if reference_column is None:
-                logger.debug("Schema difference detected: Reason 2b")
+                logger.debug("Schema difference detected: target column {} not found in reference".format(target_column_name))
+                logger.debug("target_ref = {}".format(target_columns))
+                logger.debug("temp_ref = {}".format(reference_columns))
                 return True
 
         # Nothing has detected as changed
         logger.debug("No schema difference detected")
+        logger.debug("target_ref = {}".format(target_columns))
+        logger.debug("temp_ref = {}".format(reference_columns))
         return False
 
     def alter_column_type(self, relation, column_name, new_column_type):

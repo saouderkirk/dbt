@@ -1,3 +1,5 @@
+
+import re 
 from typing import Mapping, Any, Optional
 
 from dbt.adapters.sql import SQLAdapter
@@ -91,10 +93,12 @@ class SnowflakeAdapter(SQLAdapter):
                 logger.debug("temp_ref = {}".format(reference_columns))
                 return True
 
-            # TODO - find a less sensitive way of comparing the data types
-            # 3/4. If the columns do not have the same data type and size (see core/dbt/schema.py for more details)
-            if reference_column.data_type != target_column.data_type:
-                logger.debug("Schema difference detected: Datatype {} in reference column {} do not match target datatype {}".format(reference_column.data_type, reference_column.name, target_column.datatype))
+            # 
+            # 3/4. If the columns do not have the same data type and size (see core/dbt/schema.py for more details) 
+            refernce_type = re.findall(r"^(\w*)",reference_column.data_type) # just get the name of datatype, not size/precision
+            target_type = re.findall(r"^(\w*)",target_column.data_type)
+            if refernce_type[0] != target_type[0]:
+                logger.debug("Schema difference detected: Datatype {} in reference column {} do not match target datatype {}".format(refernce_type, reference_column.name, target_type))
                 logger.debug("target_ref = {}".format(target_columns))
                 logger.debug("temp_ref = {}".format(reference_columns))
                 return True

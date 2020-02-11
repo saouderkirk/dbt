@@ -196,6 +196,7 @@ class DebugTask(BaseTask):
             pass
         # try to guess
 
+        profiles = []
         if self.raw_profile_data:
             profiles = [k for k in self.raw_profile_data if k != 'config']
             if project_profile is None:
@@ -204,13 +205,11 @@ class DebugTask(BaseTask):
                 self.messages.append('The profiles.yml has no profiles')
             elif len(profiles) == 1:
                 self.messages.append(ONLY_PROFILE_MESSAGE.format(profiles[0]))
-                return profiles
             else:
                 self.messages.append(MULTIPLE_PROFILE_MESSAGE.format(
                     '\n'.join(' - {}'.format(o) for o in profiles)
                 ))
-                return profiles
-        return []
+        return profiles
 
     def _choose_target_name(self, profile_name: str):
         has_raw_profile = (

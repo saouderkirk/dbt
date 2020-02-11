@@ -184,7 +184,7 @@ class DebugTask(BaseTask):
             try:
                 project_profile = Project.partial_load(
                     self.project_path
-                ).get('profile')
+                ).profile_name
             except dbt.exceptions.DbtProjectError:
                 pass
 

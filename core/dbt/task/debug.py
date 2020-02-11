@@ -183,7 +183,7 @@ class DebugTask(BaseTask):
         if os.path.exists(self.project_path):
             try:
                 project_profile = Project.partial_load(
-                    self.project_path
+                    os.path.dirname(self.project_path)
                 ).profile_name
             except dbt.exceptions.DbtProjectError:
                 pass

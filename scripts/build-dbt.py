@@ -175,10 +175,11 @@ def collect_output(cmd, cwd=None, stderr=subprocess.PIPE) -> str:
             cmd, cwd=cwd, check=True, stdout=subprocess.PIPE, stderr=stderr
         )
     except subprocess.CalledProcessError as exc:
-        output = exc.output.decode('utf-8')
-        error = exc.output.decode('utf-8')
-        print(f'Command {exc.cmd} failed:\n{output}')
-        print(f'{error}', file=sys.stderr)
+        print(f'Command {exc.cmd} failed')
+        if exc.output:
+            print(exc.output.decode('utf-8'))
+        if exc.stderr:
+            print(exc.stderr.decode('utf-8'), file=sys.stderr)
         raise
     return result.stdout.decode('utf-8')
 
@@ -279,10 +280,9 @@ class PoetVirtualenv(venv.EnvBuilder):
         ]
         print(f'installing homebrew-pypi-poet and dbt=={self.dbt_version}')
         try:
-            result = run_command(cmd, cwd=tmp)
+            run_command(cmd, cwd=tmp)
         finally:
             os.rmdir(tmp)
-        print(result.decode('utf-8'))
         print(f'finished installing homebrew-pypi-poet and dbt')
 
 
@@ -318,7 +318,6 @@ class HomebrewBuilder:
         env.create(venv_path)
         return venv_path
 
-
     @property
     def versioned_formula_path(self) -> Path:
         return (
@@ -341,24 +340,21 @@ class HomebrewBuilder:
               homepage "https://github.com/fishtown-analytics/dbt"
               url "{url_data}"
               sha256 "{hash_data}"
-              version "{version}"
               revision 1
-
-              depends_on "python3"
-              depends_on "openssl"
-              depends_on "postgresql"
 
               bottle do
                 root_url "http://bottles.getdbt.com"
                 # bottle hashes + versions go here
               end
 
+              depends_on "openssl@1.1"
+              depends_on "postgresql"
+              depends_on "python"
+
             {dependencies}
-
             {trailer}
-
             end
-        ''')
+            ''')
 
     @staticmethod
     def _dbt_homebrew_trailer() -> str:
@@ -379,7 +375,7 @@ class HomebrewBuilder:
 
           test do
             (testpath/"dbt_project.yml").write(
-                "{name: 'test', version: '0.0.1', profile: 'default'}"
+              "{name: 'test', version: '0.0.1', profile: 'default'}",
             )
             (testpath/".dbt/profiles.yml").write(
               "{default: {outputs: {default: {type: 'postgres', threads: 1,
@@ -455,11 +451,16 @@ class HomebrewBuilder:
         raw = collect_output(cmd)
         lines = []
         skipping = False
+        # don't do a double-newline or "brew audit" gets mad
+        skip_next = False
         for line in raw.split('\n'):
             # TODO: fork poet or extract the good bits to avoid this
             if skipping:
                 if line.strip() == 'end':
                     skipping = False
+                    skip_next = True
+            elif skip_next is True:
+                skip_next = False
             else:
                 if line.strip() == 'resource "dbt" do':
                     skipping = True
@@ -497,15 +498,10 @@ class HomebrewBuilder:
     @staticmethod
     def run_tests(formula_path: Path):
         path = os.path.normpath(formula_path)
-        try:
-            run_command(['brew', 'uninstall', '--force', path])
-            run_command(['brew', 'install', path])
-            run_command(['brew', 'test', path])
-            run_command(['brew', 'audit', '--strict', path])
-        except subprocess.CalledProcessError as exc:
-            output = exc.output.decode('utf-8')
-            print(f'Command {exc.cmd} failed:\n{output}')
-            raise
+        run_command(['brew', 'uninstall', '--force', path])
+        run_command(['brew', 'install', path])
+        run_command(['brew', 'test', path])
+        run_command(['brew', 'audit', '--strict', path])
 
     def create_default_package(self):
         os.remove(self.default_formula_path)
